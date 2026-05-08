@@ -27,3 +27,9 @@ Thumbs.db
 
 # npm
 node_modules/
+
+# md files
+*.md
+!CLAUDE.md
+!README.md
+!README.*.md
