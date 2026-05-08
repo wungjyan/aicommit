@@ -82,8 +82,12 @@ jobs:
       - name: Sync version to package.json
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          cd npm
-          npm version "$VERSION" --no-git-tag-version
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('npm/package.json', 'utf8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('npm/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
 
       - name: Publish to npm
         run: cd npm && npm publish --access public
