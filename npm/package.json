@@ -1,0 +1,19 @@
+{
+  "name": "@wungjyan/aicommit",
+  "version": "0.1.0",
+  "description": "AI-powered Git commit message generator",
+  "bin": {
+    "aicommit": "./bin/aicommit.js"
+  },
+  "scripts": {
+    "postinstall": "node postinstall.js"
+  },
+  "keywords": ["git", "commit", "ai", "conventional-commits"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wungjyan/aicommit.git"
+  },
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"]
+}
