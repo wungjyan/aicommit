@@ -1,9 +1,15 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/wungjyan/aicommit/internal/ai"
+	"github.com/wungjyan/aicommit/internal/config"
+	"github.com/wungjyan/aicommit/internal/git"
+	"github.com/wungjyan/aicommit/internal/prompt"
+	"github.com/wungjyan/aicommit/internal/ui"
 )
 
 var (
@@ -40,17 +46,89 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	// TODO: implement main flow
-	// 1. Get staged diff
-	// 2. Generate commit message via AI
-	// 3. Show confirmation prompt
-	// 4. Execute git commit
-	fmt.Println("TODO: implement main flow")
-	return nil
+	if err := git.IsGitRepo(); err != nil {
+		return err
+	}
+
+	diff, err := git.GetStagedDiff()
+	if err != nil {
+		return err
+	}
+
+	diff = git.TruncateDiff(diff, 0) // 0 = use default limit
+
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return err
+	}
+
+	provider, err := ai.NewOpenAIProvider(cfg)
+	if err != nil {
+		if errors.Is(err, ai.ErrNotConfigured) {
+			ui.Error("AI is not configured yet.")
+			fmt.Println()
+			ui.Info("Run `aicommit ai --setup` to set up your API key first.")
+			return nil
+		}
+		return err
+	}
+
+	var message string
+	spinErr := ui.Spinner("Generating commit message", func() error {
+		message, err = provider.Generate(cmd.Context(), diff)
+		return err
+	})
+	if spinErr != nil {
+		return spinErr
+	}
+
+	for {
+		valid := prompt.ValidateMessage(message) == nil
+		if !valid {
+			ui.Warn("Message does not follow Conventional Commits format.")
+		}
+
+		action, editedMsg, err := prompt.Confirm(message, valid)
+		if err != nil {
+			return err
+		}
+
+		switch action {
+		case "commit":
+			if err := git.Commit(editedMsg); err != nil {
+				return err
+			}
+			ui.Success("Committed: " + editedMsg)
+			return nil
+		case "edit":
+			message = editedMsg
+			continue
+		case "regenerate":
+			spinErr := ui.Spinner("Regenerating commit message", func() error {
+				message, err = provider.Generate(cmd.Context(), diff)
+				return err
+			})
+			if spinErr != nil {
+				return spinErr
+			}
+			continue
+		case "quit":
+			ui.Info("Aborted.")
+			return nil
+		}
+	}
 }
 
 func Execute() error {
-	return rootCmd.Execute()
+	// Silence cobra's default error printing so we can format it ourselves.
+	rootCmd.SilenceErrors = true
+	rootCmd.SilenceUsage = true
+
+	if err := rootCmd.Execute(); err != nil {
+		ui.Error(err.Error())
+		return err
+	}
+	return nil
 }
 
 func SetVersionInfo(v, c, d string) {
