@@ -1,1 +1,102 @@
 # aicommit
+
+[中文](README.zh-CN.md)
+
+AI-powered Git commit message generator. Reads your staged changes and uses an AI model to generate a [Conventional Commits](https://www.conventionalcommits.org/) message.
+
+## Features
+
+- Generates commit messages following Conventional Commits specification
+- Supports any OpenAI-compatible API (OpenAI, DeepSeek, OpenRouter, Bailian, etc.)
+- Interactive setup wizard with built-in provider presets
+- Edit, regenerate, or reject generated messages before committing
+- Validates message format and re-checks after manual edits
+- Environment variable overrides for CI and power users
+
+## Install
+
+**curl (macOS / Linux):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.sh | sh
+```
+
+**npm:**
+
+```bash
+npm i -g @wungjyan/aicommit
+```
+
+**go install:**
+
+```bash
+go install github.com/wungjyan/aicommit@latest
+```
+
+**Build from source:**
+
+```bash
+git clone https://github.com/wungjyan/aicommit.git
+cd aicommit
+go build -o aicommit .
+```
+
+## Quick Start
+
+**1. Set up your AI provider:**
+
+```bash
+aicommit ai --setup
+```
+
+The wizard shows built-in presets (OpenAI, DeepSeek, OpenRouter, Bailian) with correct URLs and models pre-filled, then verifies the connection before saving.
+
+**2. Generate a commit message:**
+
+```bash
+git add .
+aicommit
+```
+
+The tool reads your staged diff, sends it to the AI, and shows the generated message. Choose:
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Commit with the generated message |
+| `e` | Edit the message in your `$EDITOR` |
+| `r` | Regenerate a new message |
+| `q` | Quit without committing |
+
+## Configuration
+
+Config is stored at `~/.aicommit/config.json`. You can view it with:
+
+```bash
+aicommit ai
+```
+
+### Environment Variables
+
+Environment variables take priority over the config file:
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | API key |
+| `OPENAI_BASE_URL` | Base URL (e.g. `https://api.deepseek.com/v1`) |
+| `OPENAI_MODEL` | Model name (e.g. `deepseek-chat`) |
+
+This is useful for CI or when you want to override settings without changing the config file.
+
+## Supported Providers
+
+The setup wizard includes presets for:
+
+- **OpenAI** — `https://api.openai.com/v1` / `gpt-4o-mini`
+- **DeepSeek** — `https://api.deepseek.com/v1` / `deepseek-chat`
+- **OpenRouter** — `https://openrouter.ai/api/v1` / `openai/gpt-4o-mini`
+- **Bailian** — `https://dashscope.aliyuncs.com/compatible-mode/v1` / `qwen3.5-plus`
+- **Custom** — any OpenAI-compatible endpoint
+
+## License
+
+MIT
