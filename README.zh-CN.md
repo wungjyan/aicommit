@@ -15,10 +15,16 @@
 
 ## 安装
 
-**curl（macOS / Linux）：**
+**macOS / Linux（推荐）：**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.sh | sh
+```
+
+**Windows（PowerShell）：**
+
+```powershell
+irm https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.ps1 | iex
 ```
 
 **npm：**
@@ -32,6 +38,8 @@ npm i -g @wungjyan/aicommit
 ```bash
 go install github.com/wungjyan/aicommit@latest
 ```
+
+> **注意：** 请只选择一种安装方式，多种方式同时安装可能导致 PATH 冲突。
 
 **从源码构建：**
 

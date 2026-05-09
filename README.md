@@ -15,10 +15,16 @@ AI-powered Git commit message generator. Reads your staged changes and uses an A
 
 ## Install
 
-**curl (macOS / Linux):**
+**macOS / Linux (recommended):**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.ps1 | iex
 ```
 
 **npm:**
@@ -32,6 +38,8 @@ npm i -g @wungjyan/aicommit
 ```bash
 go install github.com/wungjyan/aicommit@latest
 ```
+
+> **Note:** Please use only one installation method. Multiple installations may cause PATH conflicts.
 
 **Build from source:**
 
