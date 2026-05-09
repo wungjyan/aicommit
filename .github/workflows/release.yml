@@ -91,18 +91,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
-
-      - name: Upgrade npm for trusted publishers support
-        run: npm install -g npm@latest
-
-      - name: Debug environment
-        run: |
-          echo "node: $(node --version)"
-          echo "npm: $(npm --version)"
-          echo "--- .npmrc ---"
-          cat ~/.npmrc
 
       - name: Sync version to package.json
         run: |
