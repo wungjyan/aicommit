@@ -94,6 +94,16 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm for trusted publishers support
+        run: npm install -g npm@latest
+
+      - name: Debug environment
+        run: |
+          echo "node: $(node --version)"
+          echo "npm: $(npm --version)"
+          echo "--- .npmrc ---"
+          cat ~/.npmrc
+
       - name: Sync version to package.json
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
