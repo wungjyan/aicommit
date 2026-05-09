@@ -11,7 +11,6 @@ detect_platform() {
   case "$os" in
     darwin) os="darwin" ;;
     linux)  os="linux" ;;
-    mingw*|msys*|cygwin*) os="windows" ;;
     *) echo "Unsupported OS: $os"; exit 1 ;;
   esac
   case "$arch" in
@@ -21,23 +20,30 @@ detect_platform() {
   esac
   OS="$os"
   ARCH="$arch"
-  EXT=""
-  if [ "$OS" = "windows" ]; then EXT=".exe"; fi
 }
 
 detect_install_dir() {
   if [ -w "/usr/local/bin" ]; then
     INSTALL_DIR="/usr/local/bin"
-  elif [ -d "$HOME/.local/bin" ]; then
-    INSTALL_DIR="$HOME/.local/bin"
+    SUDO=""
+  elif [ -d "/usr/local/bin" ]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+      echo "sudo is required to install to /usr/local/bin but was not found."
+      exit 1
+    fi
+    INSTALL_DIR="/usr/local/bin"
+    SUDO="sudo"
   else
     mkdir -p "$HOME/.local/bin"
     INSTALL_DIR="$HOME/.local/bin"
+    SUDO=""
   fi
 }
 
 get_latest_version() {
-  VERSION=$(curl -sL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+  VERSION=$(curl -fsSL -H "User-Agent: ${REPO}-installer" \
+    "https://api.github.com/repos/${REPO}/releases/latest" \
+    | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
   if [ -z "$VERSION" ]; then
     echo "Failed to fetch latest version"
     exit 1
@@ -49,7 +55,7 @@ main() {
   detect_install_dir
   get_latest_version
 
-  FILENAME="${BINARY}-${OS}-${ARCH}${EXT}"
+  FILENAME="${BINARY}-${OS}-${ARCH}"
   URL="https://github.com/${REPO}/releases/download/v${VERSION}/${FILENAME}"
 
   echo "Installing aicommit v${VERSION}..."
@@ -59,11 +65,17 @@ main() {
   TMPDIR="$(mktemp -d)"
   trap "rm -rf $TMPDIR" EXIT
 
-  curl -sL "$URL" -o "${TMPDIR}/${BINARY}${EXT}"
-  chmod +x "${TMPDIR}/${BINARY}${EXT}"
-  mv "${TMPDIR}/${BINARY}${EXT}" "${INSTALL_DIR}/${BINARY}${EXT}"
+  curl -fsSL "$URL" -o "${TMPDIR}/${BINARY}"
+  chmod +x "${TMPDIR}/${BINARY}"
 
-  echo "Installed: $(${INSTALL_DIR}/${BINARY} version)"
+  if ! "${TMPDIR}/${BINARY}" version >/dev/null 2>&1; then
+    echo "Downloaded binary is invalid. Aborting."
+    exit 1
+  fi
+
+  $SUDO mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+
+  echo "Installed: $("${INSTALL_DIR}/${BINARY}" version)"
   echo ""
   echo "Make sure ${INSTALL_DIR} is in your PATH."
 }
