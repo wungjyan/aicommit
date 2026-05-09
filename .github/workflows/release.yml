@@ -91,7 +91,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Sync version to package.json
@@ -105,4 +105,4 @@ jobs:
           "
 
       - name: Publish to npm
-        run: cd npm && npm publish --provenance --access public
+        run: cd npm && npm publish
