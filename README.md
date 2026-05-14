@@ -7,7 +7,7 @@ AI-powered Git commit message generator. Reads your staged changes and uses an A
 ## Features
 
 - Generates commit messages following Conventional Commits specification
-- Supports any OpenAI-compatible API (OpenAI, DeepSeek, OpenRouter, Bailian, etc.)
+- Uses the OpenAI Chat Completions API — compatible with OpenAI, DeepSeek, OpenRouter, Bailian, and any provider that implements this interface
 - Interactive setup wizard with built-in provider presets
 - Edit, regenerate, or reject generated messages before committing
 - Validates message format and re-checks after manual edits
@@ -94,6 +94,12 @@ Environment variables take priority over the config file:
 | `OPENAI_MODEL` | Model name (e.g. `deepseek-chat`) |
 
 This is useful for CI or when you want to override settings without changing the config file.
+
+## API Compatibility
+
+aicommit communicates with AI services using the **OpenAI Chat Completions API** (`POST /chat/completions`). Any provider that implements this interface is supported — you just need the correct base URL and model name.
+
+> Anthropic, Google Gemini, and other non-OpenAI-compatible APIs are **not** supported directly. If your provider exposes a Chat Completions-compatible endpoint, it will work.
 
 ## Supported Providers
 

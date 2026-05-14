@@ -7,7 +7,7 @@
 ## 功能特性
 
 - 自动生成符合 Conventional Commits 规范的提交信息
-- 支持所有 OpenAI 兼容接口（OpenAI、DeepSeek、OpenRouter、百炼等）
+- 基于 OpenAI Chat Completions API，兼容 OpenAI、DeepSeek、OpenRouter、百炼等所有实现了该接口的服务
 - 交互式配置向导，内置主流 Provider 预设
 - 提交前可编辑、重新生成或放弃生成结果
 - 自动校验格式，编辑后二次验证，防止非法消息入库
@@ -94,6 +94,12 @@ aicommit ai
 | `OPENAI_MODEL` | 模型名称（如 `deepseek-chat`） |
 
 适合在 CI 中使用，或临时切换配置而不想修改文件。
+
+## API 兼容性
+
+aicommit 使用 **OpenAI Chat Completions API**（`POST /chat/completions`）与 AI 服务通信。任何实现了该接口的 Provider 均可使用，只需填入对应的 Base URL 和模型名称即可。
+
+> 不兼容 Anthropic、Google Gemini 等非 OpenAI 格式的 API。如果你的服务商提供了 Chat Completions 兼容接口，则可以正常使用。
 
 ## 支持的 Provider
 
