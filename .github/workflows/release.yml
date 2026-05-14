@@ -57,38 +57,23 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: dist/
           merge-multiple: true
 
+      - name: Generate release notes
+        run: bash scripts/generate_release_notes.sh "${GITHUB_REF_NAME}" release-notes.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
-          body: |
-            ## Installation
-
-            **macOS / Linux:**
-            ```bash
-            curl -fsSL https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.sh | sh
-            ```
-
-            **Windows (PowerShell):**
-            ```powershell
-            irm https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.ps1 | iex
-            ```
-
-            **npm:**
-            ```bash
-            npm install -g @wungjyan/aicommit
-            ```
-
-            **Go:**
-            ```bash
-            go install github.com/wungjyan/aicommit@latest
-            ```
+          body_path: release-notes.md
 
   npm:
     needs: release
