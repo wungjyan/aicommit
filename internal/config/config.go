@@ -13,9 +13,10 @@ const configFile = "config.json"
 
 // Config holds the AI provider configuration.
 type Config struct {
-	APIKey  string `json:"api_key"`
-	BaseURL string `json:"base_url,omitempty"`
-	Model   string `json:"model,omitempty"`
+	APIKey   string `json:"api_key"`
+	BaseURL  string `json:"base_url,omitempty"`
+	Model    string `json:"model,omitempty"`
+	Language string `json:"language,omitempty"`
 }
 
 // configPath returns ~/.aicommit/config.json.

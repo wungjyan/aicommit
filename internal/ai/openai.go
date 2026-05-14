@@ -29,10 +29,11 @@ const (
 
 // OpenAIProvider implements Provider using OpenAI's chat completions API.
 type OpenAIProvider struct {
-	apiKey  string
-	baseURL string
-	model   string
-	client  *http.Client
+	apiKey   string
+	baseURL  string
+	model    string
+	language string
+	client   *http.Client
 }
 
 // NewOpenAIProvider creates a new OpenAI provider.
@@ -57,10 +58,13 @@ func NewOpenAIProvider(cfg config.Config) (*OpenAIProvider, error) {
 		model = defaultModel
 	}
 
+	language := envOr("AICOMMIT_LANGUAGE", cfg.Language)
+
 	return &OpenAIProvider{
-		apiKey:  apiKey,
-		baseURL: baseURL,
-		model:   model,
+		apiKey:   apiKey,
+		baseURL:  baseURL,
+		model:    model,
+		language: language,
 		client: &http.Client{
 			Timeout: defaultTimeout,
 		},
@@ -156,12 +160,17 @@ func (p *OpenAIProvider) Ping(ctx context.Context) error {
 }
 
 func (p *OpenAIProvider) Generate(ctx context.Context, diff string) (string, error) {
+	prompt := systemPrompt
+	if p.language != "" && p.language != "English" {
+		prompt += "\n\nWrite the commit message in " + p.language + "."
+	}
+
 	reqBody := chatRequest{
 		Model: p.model,
 		Messages: []chatMessage{
 			{
 				Role:    "system",
-				Content: systemPrompt,
+				Content: prompt,
 			},
 			{
 				Role:    "user",
