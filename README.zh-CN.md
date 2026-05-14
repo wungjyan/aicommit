@@ -92,8 +92,20 @@ aicommit ai
 | `OPENAI_API_KEY` | API Key |
 | `OPENAI_BASE_URL` | 接口地址（如 `https://api.deepseek.com/v1`） |
 | `OPENAI_MODEL` | 模型名称（如 `deepseek-chat`） |
+| `AICOMMIT_LANGUAGE` | 提交信息语言（如 `中文`、`English`） |
 
 适合在 CI 中使用，或临时切换配置而不想修改文件。
+
+### 输出语言
+
+默认生成英文提交信息，可通过配置向导修改：
+
+```bash
+aicommit ai --setup
+# 选择 "Commit output language" → 选择 English、中文，或输入自定义语言
+```
+
+支持任意语言，直接输入语言名称即可（如 `日本語`、`Français`）。
 
 ## API 兼容性
 

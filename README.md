@@ -92,8 +92,20 @@ Environment variables take priority over the config file:
 | `OPENAI_API_KEY` | API key |
 | `OPENAI_BASE_URL` | Base URL (e.g. `https://api.deepseek.com/v1`) |
 | `OPENAI_MODEL` | Model name (e.g. `deepseek-chat`) |
+| `AICOMMIT_LANGUAGE` | Commit message language (e.g. `中文`, `English`) |
 
 This is useful for CI or when you want to override settings without changing the config file.
+
+### Language
+
+By default, commit messages are generated in English. You can change the output language in the setup wizard:
+
+```bash
+aicommit ai --setup
+# Select "Commit output language" → choose English, 中文, or enter a custom language
+```
+
+Any language is supported — just type its name (e.g. `日本語`, `Français`).
 
 ## API Compatibility
 
