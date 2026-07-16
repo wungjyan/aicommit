@@ -1,14 +1,10 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wungjyan/aicommit/internal/ai"
-	"github.com/wungjyan/aicommit/internal/git"
-	"github.com/wungjyan/aicommit/internal/prompt"
 )
 
 // Build metadata, injected via -ldflags at build time. These stay as package
@@ -42,7 +38,7 @@ Usage:
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, deps)
+			return NewCommitWorkflow(deps).Run(cmd.Context())
 		},
 	}
 
@@ -66,79 +62,6 @@ func newVersionCommand(deps Dependencies) *cobra.Command {
 			fmt.Fprintf(cmd.OutOrStdout(), "aicommit %s (commit: %s, built: %s)\n", v.Version, v.Commit, v.Date)
 			return nil
 		},
-	}
-}
-
-func run(cmd *cobra.Command, deps Dependencies) error {
-	if err := deps.Git.IsGitRepo(); err != nil {
-		return err
-	}
-
-	diff, err := deps.Git.GetStagedDiff()
-	if err != nil {
-		return err
-	}
-
-	diff = git.TruncateDiff(diff, 0) // 0 = use default limit
-
-	cfg, err := deps.Config.Load()
-	if err != nil {
-		return err
-	}
-
-	provider, err := deps.Provider.New(cfg)
-	if err != nil {
-		if errors.Is(err, ai.ErrNotConfigured) {
-			deps.UI.Error("AI is not configured yet.")
-			deps.UI.Info("Run `aicommit config setup` to set up your API key first.")
-			return nil
-		}
-		return err
-	}
-
-	var message string
-	spinErr := deps.UI.Spinner("Generating commit message", func() error {
-		message, err = provider.Generate(cmd.Context(), diff)
-		return err
-	})
-	if spinErr != nil {
-		return spinErr
-	}
-
-	for {
-		valid := prompt.ValidateMessage(message) == nil
-		if !valid {
-			deps.UI.Warn("Message does not follow Conventional Commits format.")
-		}
-
-		action, editedMsg, err := deps.Confirm.Confirm(message, valid)
-		if err != nil {
-			return err
-		}
-
-		switch action {
-		case "commit":
-			if err := deps.Git.Commit(editedMsg); err != nil {
-				return err
-			}
-			deps.UI.Success("Committed: " + editedMsg)
-			return nil
-		case "edit":
-			message = editedMsg
-			continue
-		case "regenerate":
-			spinErr := deps.UI.Spinner("Regenerating commit message", func() error {
-				message, err = provider.Generate(cmd.Context(), diff)
-				return err
-			})
-			if spinErr != nil {
-				return spinErr
-			}
-			continue
-		case "quit":
-			deps.UI.Info("Aborted.")
-			return nil
-		}
 	}
 }
 

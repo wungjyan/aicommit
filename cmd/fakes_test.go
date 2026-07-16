@@ -83,9 +83,11 @@ type fakeProvider struct {
 	messages []string
 	genErr   error
 	calls    int
+	diffs    []string
 }
 
 func (f *fakeProvider) Generate(ctx context.Context, diff string) (string, error) {
+	f.diffs = append(f.diffs, diff)
 	if f.genErr != nil {
 		return "", f.genErr
 	}
