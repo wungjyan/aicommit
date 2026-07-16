@@ -12,7 +12,12 @@ const configDir = ".aicommit"
 const configFile = "config.json"
 
 // Config holds the AI provider configuration.
+//
+// Backend selects which AI backend generates messages. It may be empty in
+// configs written before multi-backend support; Resolve interprets an empty
+// Backend as the OpenAI backend so existing API configs keep working.
 type Config struct {
+	Backend  string `json:"backend,omitempty"`
 	APIKey   string `json:"api_key"`
 	BaseURL  string `json:"base_url,omitempty"`
 	Model    string `json:"model,omitempty"`
