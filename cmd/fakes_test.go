@@ -121,6 +121,7 @@ type recordingUI struct {
 	errs    []string
 	warns   []string
 	infos   []string
+	noColor int
 }
 
 func (u *recordingUI) Success(msg string) { u.success = append(u.success, msg) }
@@ -130,11 +131,27 @@ func (u *recordingUI) Info(msg string)    { u.infos = append(u.infos, msg) }
 func (u *recordingUI) Spinner(label string, fn func() error) error {
 	return fn()
 }
+func (u *recordingUI) DisableColor() { u.noColor++ }
 
 // scriptedConfirm replays a fixed sequence of confirmation actions.
 type scriptedConfirm struct {
 	actions []confirmStep
 	calls   int
+}
+
+// fakeEditor records direct edit requests and returns a canned replacement.
+type fakeEditor struct {
+	edited string
+	err    error
+	calls  int
+}
+
+func (f *fakeEditor) Edit(message string) (string, error) {
+	f.calls++
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.edited, nil
 }
 
 type confirmStep struct {
@@ -173,6 +190,8 @@ func testDeps() (Dependencies, *bytes.Buffer, *bytes.Buffer) {
 		Backend:  fakeBackend{},
 		UI:       &recordingUI{},
 		Confirm:  &scriptedConfirm{},
+		Editor:   &fakeEditor{},
+		IsTTY:    func(any) bool { return true },
 		Version:  VersionInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-07-16T00:00:00Z"},
 	}
 	return deps, &out, &errOut

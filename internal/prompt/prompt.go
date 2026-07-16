@@ -167,3 +167,10 @@ func editMessage(original string) (string, error) {
 
 	return edited, nil
 }
+
+// EditMessage opens the configured editor for a generated commit message.
+// It is exported for the command adapter; interactive confirmation continues
+// to use the same implementation through editMessage.
+func EditMessage(original string) (string, error) {
+	return editMessage(original)
+}

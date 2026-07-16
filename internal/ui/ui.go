@@ -30,6 +30,18 @@ func init() {
 	}
 }
 
+// DisableColor removes ANSI color and style sequences for the current process.
+// Command-level --no-color calls this before any interactive UI is rendered.
+func DisableColor() {
+	colorReset = ""
+	colorRed = ""
+	colorGreen = ""
+	colorYellow = ""
+	colorCyan = ""
+	colorBold = ""
+	colorDim = ""
+}
+
 func isTerminal(f *os.File) bool {
 	fi, err := f.Stat()
 	if err != nil {

@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 
 	"github.com/wungjyan/aicommit/internal/ai"
 	"github.com/wungjyan/aicommit/internal/git"
@@ -18,6 +20,7 @@ type CommitWorkflow struct {
 	provider ProviderFactory
 	ui       UI
 	confirm  Confirmer
+	editor   MessageEditor
 }
 
 // NewCommitWorkflow creates the default command workflow from command
@@ -30,6 +33,7 @@ func NewCommitWorkflow(deps Dependencies) *CommitWorkflow {
 		provider: deps.Provider,
 		ui:       deps.UI,
 		confirm:  deps.Confirm,
+		editor:   deps.Editor,
 	}
 }
 
@@ -37,6 +41,12 @@ func NewCommitWorkflow(deps Dependencies) *CommitWorkflow {
 // confirmation state machine. Regeneration deliberately reuses the same
 // bounded diff so each attempt sees an identical input.
 func (w *CommitWorkflow) Run(ctx context.Context) error {
+	return w.runWithOptions(ctx, runOptions{}, io.Discard)
+}
+
+// runWithOptions applies the default workflow in an automatic or interactive
+// mode. The root command validates the mode combinations before calling it.
+func (w *CommitWorkflow) runWithOptions(ctx context.Context, options runOptions, out io.Writer) error {
 	if err := w.git.IsGitRepo(); err != nil {
 		return err
 	}
@@ -62,9 +72,28 @@ func (w *CommitWorkflow) Run(ctx context.Context) error {
 		return err
 	}
 
-	message, err := w.generate(ctx, provider, diff, "Generating commit message")
+	message, err := w.generate(ctx, provider, diff, "Generating commit message", !options.dryRun)
 	if err != nil {
 		return err
+	}
+	if options.edit {
+		message, err = w.editor.Edit(message)
+		if err != nil {
+			return err
+		}
+	}
+	if options.dryRun {
+		_, writeErr := fmt.Fprintln(out, message)
+		if writeErr != nil {
+			return writeErr
+		}
+		return prompt.ValidateMessage(message)
+	}
+	if options.yes {
+		if err := prompt.ValidateMessage(message); err != nil {
+			return err
+		}
+		return w.commit(message)
 	}
 
 	for {
@@ -80,15 +109,11 @@ func (w *CommitWorkflow) Run(ctx context.Context) error {
 
 		switch action {
 		case "commit":
-			if err := w.git.Commit(editedMessage); err != nil {
-				return err
-			}
-			w.ui.Success("Committed: " + editedMessage)
-			return nil
+			return w.commit(editedMessage)
 		case "edit":
 			message = editedMessage
 		case "regenerate":
-			message, err = w.generate(ctx, provider, diff, "Regenerating commit message")
+			message, err = w.generate(ctx, provider, diff, "Regenerating commit message", true)
 			if err != nil {
 				return err
 			}
@@ -99,12 +124,24 @@ func (w *CommitWorkflow) Run(ctx context.Context) error {
 	}
 }
 
-func (w *CommitWorkflow) generate(ctx context.Context, provider Provider, diff, label string) (string, error) {
+func (w *CommitWorkflow) commit(message string) error {
+	if err := w.git.Commit(message); err != nil {
+		return err
+	}
+	w.ui.Success("Committed: " + message)
+	return nil
+}
+
+func (w *CommitWorkflow) generate(ctx context.Context, provider Provider, diff, label string, showProgress bool) (string, error) {
 	var message string
-	err := w.ui.Spinner(label, func() error {
+	generate := func() error {
 		var err error
 		message, err = provider.Generate(ctx, diff)
 		return err
-	})
+	}
+	if !showProgress {
+		return message, generate()
+	}
+	err := w.ui.Spinner(label, generate)
 	return message, err
 }

@@ -21,6 +21,8 @@ func productionDeps(v VersionInfo) Dependencies {
 		Backend:  backendAdapter{},
 		UI:       uiAdapter{},
 		Confirm:  confirmAdapter{},
+		Editor:   editorAdapter{},
+		IsTTY:    isTerminal,
 		Version:  v,
 	}
 }
@@ -63,11 +65,18 @@ func (uiAdapter) Error(msg string)                            { ui.Error(msg) }
 func (uiAdapter) Warn(msg string)                             { ui.Warn(msg) }
 func (uiAdapter) Info(msg string)                             { ui.Info(msg) }
 func (uiAdapter) Spinner(label string, fn func() error) error { return ui.Spinner(label, fn) }
+func (uiAdapter) DisableColor()                               { ui.DisableColor() }
 
 type confirmAdapter struct{}
 
 func (confirmAdapter) Confirm(message string, valid bool) (string, string, error) {
 	return prompt.Confirm(message, valid)
+}
+
+type editorAdapter struct{}
+
+func (editorAdapter) Edit(message string) (string, error) {
+	return prompt.EditMessage(message)
 }
 
 // compile-time assertion that the OpenAI provider satisfies the local Provider

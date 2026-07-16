@@ -25,6 +25,8 @@ type Dependencies struct {
 	Backend  BackendService
 	UI       UI
 	Confirm  Confirmer
+	Editor   MessageEditor
+	IsTTY    func(any) bool
 
 	Version VersionInfo
 }
@@ -75,6 +77,13 @@ type Confirmer interface {
 	Confirm(message string, valid bool) (action string, edited string, err error)
 }
 
+// MessageEditor edits a generated commit message before it enters the normal
+// confirmation loop. It is separate from Confirmer so --edit remains testable
+// without launching a real editor.
+type MessageEditor interface {
+	Edit(message string) (string, error)
+}
+
 // UI abstracts user-facing status output and the spinner.
 type UI interface {
 	Success(msg string)
@@ -82,4 +91,5 @@ type UI interface {
 	Warn(msg string)
 	Info(msg string)
 	Spinner(label string, fn func() error) error
+	DisableColor()
 }
