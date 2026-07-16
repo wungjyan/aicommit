@@ -1,8 +1,11 @@
 package prompt
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -47,7 +50,7 @@ func TestEditMessage(t *testing.T) {
 		os.Setenv("EDITOR", "sed -i '' s/original/edited/")
 		defer os.Unsetenv("EDITOR")
 
-		result, err := editMessage("original text")
+		result, err := EditMessage(strings.NewReader(""), io.Discard, io.Discard, "original text")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -60,7 +63,7 @@ func TestEditMessage(t *testing.T) {
 		os.Setenv("EDITOR", "true")
 		defer os.Unsetenv("EDITOR")
 
-		result, err := editMessage("unchanged text")
+		result, err := EditMessage(strings.NewReader(""), io.Discard, io.Discard, "unchanged text")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -68,4 +71,24 @@ func TestEditMessage(t *testing.T) {
 			t.Errorf("expected 'unchanged text', got %q", result)
 		}
 	})
+}
+
+type plainStyle struct{}
+
+func (plainStyle) Bold(s string) string      { return s }
+func (plainStyle) Highlight(s string) string { return s }
+
+func TestConfirmUsesInjectedStreams(t *testing.T) {
+	var output bytes.Buffer
+	action, _, err := Confirm(strings.NewReader("invalid\nq\n"), &output, plainStyle{}, "feat: add output routing", true)
+	if err != nil {
+		t.Fatalf("Confirm returned error: %v", err)
+	}
+	if action != "quit" {
+		t.Errorf("action = %q, want quit", action)
+	}
+	got := output.String()
+	if !strings.Contains(got, "Generated commit message:") || !strings.Contains(got, "Invalid input") {
+		t.Errorf("injected output missing confirmation diagnostics:\n%s", got)
+	}
 }

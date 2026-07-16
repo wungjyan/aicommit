@@ -3,12 +3,11 @@ package prompt
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-
-	"github.com/wungjyan/aicommit/internal/ui"
 )
 
 var validTypes = map[string]bool{
@@ -54,78 +53,86 @@ func ValidateMessage(message string) error {
 	return nil
 }
 
+// Style formats prompt labels and generated messages without choosing an output
+// destination.
+type Style interface {
+	Bold(string) string
+	Highlight(string) string
+}
+
 // Confirm shows the generated commit message and asks for user confirmation.
 // When valid is false (message failed ValidateMessage), the commit option is
 // hidden — the user must edit or regenerate first.
 // Returns: action ("commit", "edit", "regenerate", "quit"), edited message (if action is "edit"), error.
-func Confirm(message string, valid bool) (action string, editedMessage string, err error) {
-	fmt.Println()
-	fmt.Println(ui.Bold("Generated commit message:"))
-	fmt.Println()
-	fmt.Println("  " + ui.Highlight(message))
-	fmt.Println()
+func Confirm(in io.Reader, out io.Writer, style Style, message string, valid bool) (action string, editedMessage string, err error) {
+	reader := bufio.NewReader(in)
+	for {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, style.Bold("Generated commit message:"))
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "  "+style.Highlight(message))
+		fmt.Fprintln(out)
 
-	if valid {
-		fmt.Printf("%s  %s  %s  %s\n",
-			ui.Bold("[Enter]")+" commit",
-			ui.Bold("[e]")+" edit",
-			ui.Bold("[r]")+" regenerate",
-			ui.Bold("[q]")+" quit",
-		)
-	} else {
-		fmt.Printf("%s  %s  %s\n",
-			ui.Bold("[e]")+" edit",
-			ui.Bold("[r]")+" regenerate",
-			ui.Bold("[q]")+" quit",
-		)
-	}
+		if valid {
+			fmt.Fprintf(out, "%s  %s  %s  %s\n",
+				style.Bold("[Enter]")+" commit",
+				style.Bold("[e]")+" edit",
+				style.Bold("[r]")+" regenerate",
+				style.Bold("[q]")+" quit",
+			)
+		} else {
+			fmt.Fprintf(out, "%s  %s  %s\n",
+				style.Bold("[e]")+" edit",
+				style.Bold("[r]")+" regenerate",
+				style.Bold("[q]")+" quit",
+			)
+		}
 
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return "", "", fmt.Errorf("failed to read input: %w", err)
-	}
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", "", fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
 
-	input = strings.TrimSpace(strings.ToLower(input))
+		if valid {
+			switch input {
+			case "", "y", "yes":
+				return "commit", message, nil
+			case "e", "edit":
+				edited, editErr := EditMessage(in, out, out, message)
+				if editErr != nil {
+					return "", "", editErr
+				}
+				return "edit", edited, nil
+			case "r", "regenerate":
+				return "regenerate", "", nil
+			case "q", "quit":
+				return "quit", "", nil
+			default:
+				fmt.Fprintln(out, "Invalid input. Please enter, e, r, or q.")
+			}
+			continue
+		}
 
-	if valid {
 		switch input {
-		case "", "y", "yes":
-			return "commit", message, nil
 		case "e", "edit":
-			edited, editErr := editMessage(message)
+			edited, editErr := EditMessage(in, out, out, message)
 			if editErr != nil {
 				return "", "", editErr
 			}
 			return "edit", edited, nil
-		case "r", "regenerate":
+		case "r", "regenerate", "":
 			return "regenerate", "", nil
 		case "q", "quit":
 			return "quit", "", nil
 		default:
-			fmt.Println("Invalid input. Please enter, e, r, or q.")
-			return Confirm(message, valid)
+			fmt.Fprintln(out, "Invalid input. Please enter e, r, or q.")
 		}
-	}
-
-	switch input {
-	case "e", "edit":
-		edited, editErr := editMessage(message)
-		if editErr != nil {
-			return "", "", editErr
-		}
-		return "edit", edited, nil
-	case "r", "regenerate", "":
-		return "regenerate", "", nil
-	case "q", "quit":
-		return "quit", "", nil
-	default:
-		fmt.Println("Invalid input. Please enter e, r, or q.")
-		return Confirm(message, valid)
 	}
 }
 
-func editMessage(original string) (string, error) {
+// EditMessage opens the configured editor using the supplied terminal streams.
+func EditMessage(in io.Reader, out, errOut io.Writer, original string) (string, error) {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
 		editor = os.Getenv("VISUAL")
@@ -147,9 +154,9 @@ func editMessage(original string) (string, error) {
 	tmpFile.Close()
 
 	cmd := exec.Command("sh", "-c", editor+` "`+strings.ReplaceAll(tmpFile.Name(), `"`, `\"`)+`"`)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdin = in
+	cmd.Stdout = out
+	cmd.Stderr = errOut
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("editor failed: %w", err)
@@ -166,11 +173,4 @@ func editMessage(original string) (string, error) {
 	}
 
 	return edited, nil
-}
-
-// EditMessage opens the configured editor for a generated commit message.
-// It is exported for the command adapter; interactive confirmation continues
-// to use the same implementation through editMessage.
-func EditMessage(original string) (string, error) {
-	return editMessage(original)
 }

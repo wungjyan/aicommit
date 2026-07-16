@@ -13,6 +13,5 @@ func Commit(message string) error {
 		return fmt.Errorf("git commit failed: %s\n%w", string(output), err)
 	}
 
-	fmt.Print(string(output))
 	return nil
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"io"
 
 	"github.com/wungjyan/aicommit/internal/ai"
 	"github.com/wungjyan/aicommit/internal/config"
@@ -13,15 +14,19 @@ import (
 // productionDeps wires the command tree to the real Git repo, config file,
 // AI backend, prompt and UI. It preserves the behavior that existed before the
 // command layer became injectable.
-func productionDeps(v VersionInfo) Dependencies {
+func productionDeps(v VersionInfo, in io.Reader, out, errOut io.Writer) Dependencies {
+	terminalUI := ui.New(errOut)
 	return Dependencies{
+		In:       in,
+		Out:      out,
+		ErrOut:   errOut,
 		Git:      gitAdapter{},
 		Config:   configAdapter{},
 		Provider: providerFactory{},
 		Backend:  backendAdapter{},
-		UI:       uiAdapter{},
-		Confirm:  confirmAdapter{},
-		Editor:   editorAdapter{},
+		UI:       terminalUI,
+		Confirm:  confirmAdapter{in: in, out: errOut, style: terminalUI},
+		Editor:   editorAdapter{in: in, out: errOut, errOut: errOut},
 		IsTTY:    isTerminal,
 		Version:  v,
 	}
@@ -58,25 +63,24 @@ func (providerFactory) New(cfg config.Config) (Provider, error) {
 	return ai.NewProvider(cfg)
 }
 
-type uiAdapter struct{}
-
-func (uiAdapter) Success(msg string)                          { ui.Success(msg) }
-func (uiAdapter) Error(msg string)                            { ui.Error(msg) }
-func (uiAdapter) Warn(msg string)                             { ui.Warn(msg) }
-func (uiAdapter) Info(msg string)                             { ui.Info(msg) }
-func (uiAdapter) Spinner(label string, fn func() error) error { return ui.Spinner(label, fn) }
-func (uiAdapter) DisableColor()                               { ui.DisableColor() }
-
-type confirmAdapter struct{}
-
-func (confirmAdapter) Confirm(message string, valid bool) (string, string, error) {
-	return prompt.Confirm(message, valid)
+type confirmAdapter struct {
+	in    io.Reader
+	out   io.Writer
+	style prompt.Style
 }
 
-type editorAdapter struct{}
+func (a confirmAdapter) Confirm(message string, valid bool) (string, string, error) {
+	return prompt.Confirm(a.in, a.out, a.style, message, valid)
+}
 
-func (editorAdapter) Edit(message string) (string, error) {
-	return prompt.EditMessage(message)
+type editorAdapter struct {
+	in     io.Reader
+	out    io.Writer
+	errOut io.Writer
+}
+
+func (a editorAdapter) Edit(message string) (string, error) {
+	return prompt.EditMessage(a.in, a.out, a.errOut, message)
 }
 
 // compile-time assertion that the OpenAI provider satisfies the local Provider

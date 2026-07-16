@@ -117,10 +117,7 @@ func newVersionCommand(deps Dependencies) *cobra.Command {
 // Execute builds the production command tree and runs it. Errors are printed via
 // the UI adapter for colored output, mirroring the previous behavior.
 func Execute() error {
-	deps := productionDeps(VersionInfo{Version: version, Commit: commit, Date: date})
-	deps.In = os.Stdin
-	deps.Out = os.Stdout
-	deps.ErrOut = os.Stderr
+	deps := productionDeps(VersionInfo{Version: version, Commit: commit, Date: date}, os.Stdin, os.Stdout, os.Stderr)
 
 	rootCmd := NewRootCommand(deps)
 

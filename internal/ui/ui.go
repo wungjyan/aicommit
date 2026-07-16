@@ -2,127 +2,139 @@ package ui
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
+
+	"golang.org/x/term"
 )
 
-// ANSI color codes — disabled automatically when stdout is not a terminal.
-var (
-	colorReset  = "\033[0m"
-	colorRed    = "\033[31m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorCyan   = "\033[36m"
-	colorBold   = "\033[1m"
-	colorDim    = "\033[2m"
-)
+// UI writes human-facing diagnostics to one injected stream. Command data is
+// written by the command layer to stdout and never passes through this type.
+type UI struct {
+	writer  io.Writer
+	color   bool
+	spinner bool
+}
 
-func init() {
-	// Disable colors when not writing to a real terminal (e.g. piped output).
-	if !isTerminal(os.Stdout) {
-		colorReset = ""
-		colorRed = ""
-		colorGreen = ""
-		colorYellow = ""
-		colorCyan = ""
-		colorBold = ""
-		colorDim = ""
+// New creates a diagnostic UI. Color and animated spinner output are enabled
+// only when the target writer is a terminal.
+func New(writer io.Writer) *UI {
+	return newUI(writer, isTerminal)
+}
+
+func newUI(writer io.Writer, terminal func(io.Writer) bool) *UI {
+	if writer == nil {
+		writer = io.Discard
 	}
+	isTerminal := terminal(writer)
+	return &UI{writer: writer, color: isTerminal, spinner: isTerminal}
 }
 
-// DisableColor removes ANSI color and style sequences for the current process.
-// Command-level --no-color calls this before any interactive UI is rendered.
-func DisableColor() {
-	colorReset = ""
-	colorRed = ""
-	colorGreen = ""
-	colorYellow = ""
-	colorCyan = ""
-	colorBold = ""
-	colorDim = ""
+func isTerminal(writer io.Writer) bool {
+	file, ok := writer.(*os.File)
+	return ok && term.IsTerminal(int(file.Fd()))
 }
 
-func isTerminal(f *os.File) bool {
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
+// DisableColor suppresses ANSI color and style sequences without changing the
+// selected writer or spinner behavior.
+func (u *UI) DisableColor() {
+	u.color = false
 }
 
-// Success prints a green ✔ message.
-func Success(msg string) {
-	fmt.Printf("%s✔ %s%s\n", colorGreen, msg, colorReset)
+// Success writes a successful status message to the diagnostic stream.
+func (u *UI) Success(msg string) {
+	fmt.Fprintf(u.writer, "%s%s %s%s\n", u.green(), "✔", msg, u.reset())
 }
 
-// Error prints a red ✘ message.
-func Error(msg string) {
-	fmt.Printf("%s✘ %s%s\n", colorRed, msg, colorReset)
+// Error writes an error status message to the diagnostic stream.
+func (u *UI) Error(msg string) {
+	fmt.Fprintf(u.writer, "%s%s %s%s\n", u.red(), "✘", msg, u.reset())
 }
 
-// Warn prints a yellow ⚠ message.
-func Warn(msg string) {
-	fmt.Printf("%s⚠ %s%s\n", colorYellow, msg, colorReset)
+// Warn writes a warning status message to the diagnostic stream.
+func (u *UI) Warn(msg string) {
+	fmt.Fprintf(u.writer, "%s%s %s%s\n", u.yellow(), "⚠", msg, u.reset())
 }
 
-// Info prints a cyan ℹ message.
-func Info(msg string) {
-	fmt.Printf("%sℹ %s%s\n", colorCyan, msg, colorReset)
+// Info writes an informational status message to the diagnostic stream.
+func (u *UI) Info(msg string) {
+	fmt.Fprintf(u.writer, "%s%s %s%s\n", u.cyan(), "ℹ", msg, u.reset())
 }
 
-// Bold returns text wrapped in bold ANSI codes.
-func Bold(s string) string {
-	return colorBold + s + colorReset
+// Bold returns text styled for terminal prompts.
+func (u *UI) Bold(s string) string {
+	return u.bold() + s + u.reset()
 }
 
-// Dim returns text wrapped in dim ANSI codes.
-func Dim(s string) string {
-	return colorDim + s + colorReset
+// Highlight returns highlighted text for terminal prompts.
+func (u *UI) Highlight(s string) string {
+	return u.cyan() + s + u.reset()
 }
 
-// Highlight returns text in cyan.
-func Highlight(s string) string {
-	return colorCyan + s + colorReset
-}
-
-// Spinner runs a terminal spinner in the background while fn executes.
-// It prints a final success or error line depending on the returned error.
-func Spinner(label string, fn func() error) error {
-	if !isTerminal(os.Stdout) {
-		// No spinner in non-interactive mode — just run the function.
-		fmt.Printf("%s... ", label)
+// Spinner runs fn while rendering progress on the diagnostic stream. Non-TTY
+// destinations receive a stable one-line status rather than terminal control
+// sequences, preserving useful logs for automation.
+func (u *UI) Spinner(label string, fn func() error) error {
+	if !u.spinner {
+		fmt.Fprintf(u.writer, "%s... ", label)
 		err := fn()
 		if err != nil {
-			fmt.Println("failed")
+			fmt.Fprintln(u.writer, "failed")
 		} else {
-			fmt.Println("done")
+			fmt.Fprintln(u.writer, "done")
 		}
 		return err
 	}
 
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	done := make(chan error, 1)
+	go func() { done <- fn() }()
 
-	go func() {
-		done <- fn()
-	}()
-
-	i := 0
-	for {
+	for i := 0; ; i++ {
 		select {
 		case err := <-done:
-			// Clear the spinner line.
-			fmt.Printf("\r\033[K")
+			fmt.Fprint(u.writer, "\r\033[K")
 			if err != nil {
-				fmt.Printf("%s✘ %s%s\n", colorRed, label, colorReset)
+				fmt.Fprintf(u.writer, "%s%s %s%s\n", u.red(), "✘", label, u.reset())
 			} else {
-				fmt.Printf("%s✔ %s%s\n", colorGreen, label, colorReset)
+				fmt.Fprintf(u.writer, "%s%s %s%s\n", u.green(), "✔", label, u.reset())
 			}
 			return err
 		default:
-			fmt.Printf("\r%s%s%s %s", colorCyan, frames[i%len(frames)], colorReset, label)
-			i++
+			fmt.Fprintf(u.writer, "\r%s%s%s %s", u.cyan(), frames[i%len(frames)], u.reset(), label)
 			time.Sleep(80 * time.Millisecond)
 		}
 	}
+}
+
+func (u *UI) reset() string {
+	return u.style("\033[0m")
+}
+
+func (u *UI) red() string {
+	return u.style("\033[31m")
+}
+
+func (u *UI) green() string {
+	return u.style("\033[32m")
+}
+
+func (u *UI) yellow() string {
+	return u.style("\033[33m")
+}
+
+func (u *UI) cyan() string {
+	return u.style("\033[36m")
+}
+
+func (u *UI) bold() string {
+	return u.style("\033[1m")
+}
+
+func (u *UI) style(code string) string {
+	if !u.color {
+		return ""
+	}
+	return code
 }
