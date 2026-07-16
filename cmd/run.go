@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
-	"github.com/wungjyan/aicommit/internal/ai"
 	"github.com/wungjyan/aicommit/internal/git"
 	"github.com/wungjyan/aicommit/internal/prompt"
 )
@@ -64,11 +62,6 @@ func (w *CommitWorkflow) runWithOptions(ctx context.Context, options runOptions,
 
 	provider, err := w.provider.New(cfg)
 	if err != nil {
-		if errors.Is(err, ai.ErrNotConfigured) {
-			w.ui.Error("AI is not configured yet.")
-			w.ui.Info("Run `aicommit config setup` to set up your API key first.")
-			return nil
-		}
 		return err
 	}
 
@@ -87,10 +80,10 @@ func (w *CommitWorkflow) runWithOptions(ctx context.Context, options runOptions,
 		if writeErr != nil {
 			return writeErr
 		}
-		return prompt.ValidateMessage(message)
+		return validateGeneratedMessage(message)
 	}
 	if options.yes {
-		if err := prompt.ValidateMessage(message); err != nil {
+		if err := validateGeneratedMessage(message); err != nil {
 			return err
 		}
 		return w.commit(message)
@@ -109,6 +102,9 @@ func (w *CommitWorkflow) runWithOptions(ctx context.Context, options runOptions,
 
 		switch action {
 		case "commit":
+			if err := validateGeneratedMessage(editedMessage); err != nil {
+				return err
+			}
 			return w.commit(editedMessage)
 		case "edit":
 			message = editedMessage
@@ -122,6 +118,13 @@ func (w *CommitWorkflow) runWithOptions(ctx context.Context, options runOptions,
 			return nil
 		}
 	}
+}
+
+func validateGeneratedMessage(message string) error {
+	if err := prompt.ValidateMessage(message); err != nil {
+		return invalidMessageError(err)
+	}
+	return nil
 }
 
 func (w *CommitWorkflow) commit(message string) error {

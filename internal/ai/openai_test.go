@@ -157,8 +157,11 @@ func TestGenerate(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error for 500 status")
 		}
+		if !errors.Is(err, ErrRequestFailed) {
+			t.Errorf("expected ErrRequestFailed, got %v", err)
+		}
 		if errors.Is(err, ErrAPIKeyInvalid) || errors.Is(err, ErrRateLimited) {
-			t.Errorf("unexpected sentinel error: %v", err)
+			t.Errorf("unexpected authentication/rate-limit error: %v", err)
 		}
 	})
 

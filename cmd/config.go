@@ -20,7 +20,7 @@ func newConfigCommand(deps Dependencies) *cobra.Command {
 		Short: "Show or manage aicommit configuration",
 		Long: `Show the effective configuration and its sources, or manage it with the
 setup, set, check and path subcommands.`,
-		Args: cobra.NoArgs,
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConfigDisplay(cmd, deps, jsonOut)
 		},

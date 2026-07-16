@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -62,6 +63,20 @@ func TestUnknownCommand(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown command") {
 		t.Errorf("error = %v, want it to mention unknown command", err)
+	}
+	if got := ExitCode(err); got != ExitUsageError {
+		t.Errorf("ExitCode = %d, want %d", got, ExitUsageError)
+	}
+}
+
+func TestUnknownFlagReturnsUsageExitCode(t *testing.T) {
+	deps, _, _ := testDeps()
+	err := execute(NewRootCommand(deps), "--does-not-exist")
+	if !errors.Is(err, ErrUsage) {
+		t.Fatalf("error = %v, want ErrUsage", err)
+	}
+	if got := ExitCode(err); got != ExitUsageError {
+		t.Errorf("ExitCode = %d, want %d", got, ExitUsageError)
 	}
 }
 
@@ -161,19 +176,18 @@ func TestRunRegenerateReusesDiff(t *testing.T) {
 	}
 }
 
-func TestRunNotConfiguredIsNotFatal(t *testing.T) {
+func TestRunNotConfiguredReturnsAIError(t *testing.T) {
 	deps, _, _ := testDeps()
 	deps.Git = &fakeGit{diff: "diff"}
 	deps.Provider = fakeFactory{err: ai.ErrNotConfigured}
-	ui := &recordingUI{}
-	deps.UI = ui
 
 	cmd := NewRootCommand(deps)
-	if err := execute(cmd); err != nil {
-		t.Fatalf("expected nil error when unconfigured, got %v", err)
+	err := execute(cmd)
+	if !errors.Is(err, ai.ErrNotConfigured) {
+		t.Fatalf("error = %v, want ErrNotConfigured", err)
 	}
-	if len(ui.errs) == 0 {
-		t.Error("expected a UI error message about missing configuration")
+	if got := ExitCode(err); got != ExitAIError {
+		t.Errorf("ExitCode = %d, want %d", got, ExitAIError)
 	}
 }
 

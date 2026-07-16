@@ -102,7 +102,7 @@ func (p *OpenAIProvider) Ping(ctx context.Context) error {
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("cannot reach %s: %w", p.baseURL, err)
+		return fmt.Errorf("cannot reach %s: %w", p.baseURL, requestFailed(err))
 	}
 	defer resp.Body.Close()
 
@@ -119,7 +119,7 @@ func (p *OpenAIProvider) Ping(ctx context.Context) error {
 		if len(preview) > 200 {
 			preview = preview[:200] + "..."
 		}
-		return fmt.Errorf("unexpected status %d from %s: %s", resp.StatusCode, p.baseURL, preview)
+		return fmt.Errorf("%w: unexpected status %d from %s: %s", ErrRequestFailed, resp.StatusCode, p.baseURL, preview)
 	}
 }
 
@@ -159,13 +159,13 @@ func (p *OpenAIProvider) Generate(ctx context.Context, diff string) (string, err
 		if errors.Is(err, context.DeadlineExceeded) || isTimeoutError(err) {
 			return "", fmt.Errorf("AI request timed out (waited %s) — the model may be slow, please retry: %w", defaultTimeout, ErrRequestFailed)
 		}
-		return "", fmt.Errorf("failed to call AI API: %w", err)
+		return "", fmt.Errorf("failed to call AI API: %w", requestFailed(err))
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return "", fmt.Errorf("failed to read response: %w", requestFailed(err))
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -175,7 +175,7 @@ func (p *OpenAIProvider) Generate(ctx context.Context, diff string) (string, err
 		case http.StatusTooManyRequests:
 			return "", ErrRateLimited
 		default:
-			return "", fmt.Errorf("AI API error (status %d): %s", resp.StatusCode, string(respBody))
+			return "", fmt.Errorf("%w: AI API error (status %d): %s", ErrRequestFailed, resp.StatusCode, string(respBody))
 		}
 	}
 
@@ -185,15 +185,15 @@ func (p *OpenAIProvider) Generate(ctx context.Context, diff string) (string, err
 		if len(preview) > 200 {
 			preview = preview[:200] + "..."
 		}
-		return "", fmt.Errorf("failed to parse response (got: %s): %w", preview, err)
+		return "", fmt.Errorf("failed to parse response (got: %s): %w", preview, requestFailed(err))
 	}
 
 	if chatResp.Error != nil {
-		return "", fmt.Errorf("OpenAI API error: %s", chatResp.Error.Message)
+		return "", fmt.Errorf("%w: OpenAI API error: %s", ErrRequestFailed, chatResp.Error.Message)
 	}
 
 	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no commit message generated")
+		return "", fmt.Errorf("%w: no commit message generated", ErrRequestFailed)
 	}
 
 	message := strings.TrimSpace(chatResp.Choices[0].Message.Content)
@@ -201,4 +201,8 @@ func (p *OpenAIProvider) Generate(ctx context.Context, diff string) (string, err
 	message = strings.Trim(message, "`\"'")
 
 	return message, nil
+}
+
+func requestFailed(err error) error {
+	return fmt.Errorf("%w: %w", ErrRequestFailed, err)
 }

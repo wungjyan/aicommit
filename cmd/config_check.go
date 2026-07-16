@@ -18,7 +18,7 @@ func newConfigCheckCommand(deps Dependencies) *cobra.Command {
 	return &cobra.Command{
 		Use:   "check",
 		Short: "Verify the current AI configuration and connection",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := deps.Config.Load()
 			if err != nil {

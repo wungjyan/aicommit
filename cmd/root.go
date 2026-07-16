@@ -37,7 +37,7 @@ a commit message following the Conventional Commits specification.
 Usage:
   git add .
   aicommit`,
-		Args:          cobra.NoArgs,
+		Args:          noArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -57,6 +57,9 @@ Usage:
 	rootCmd.SetIn(deps.In)
 	rootCmd.SetOut(deps.Out)
 	rootCmd.SetErr(deps.ErrOut)
+	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		return fmt.Errorf("%w: %w", ErrUsage, err)
+	})
 	rootCmd.Flags().BoolVar(&options.dryRun, "dry-run", false, "generate and print a commit message without committing")
 	rootCmd.Flags().BoolVarP(&options.yes, "yes", "y", false, "commit the generated message without confirmation")
 	rootCmd.Flags().BoolVarP(&options.edit, "edit", "e", false, "edit the generated message before continuing")
@@ -105,7 +108,7 @@ func newVersionCommand(deps Dependencies) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			v := deps.Version
 			fmt.Fprintf(cmd.OutOrStdout(), "aicommit %s (commit: %s, built: %s)\n", v.Version, v.Commit, v.Date)

@@ -36,7 +36,7 @@ func newConfigSetupCommand(deps Dependencies) *cobra.Command {
 	return &cobra.Command{
 		Use:   "setup",
 		Short: "Run the interactive configuration wizard",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConfigSetup(cmd, deps)
 		},

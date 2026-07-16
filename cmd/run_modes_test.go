@@ -40,8 +40,11 @@ func TestDryRunInvalidMessageWritesItAndFails(t *testing.T) {
 	deps.Provider = fakeFactory{provider: &fakeProvider{messages: []string{"invalid message"}}}
 
 	err := execute(NewRootCommand(deps), "--dry-run")
-	if err == nil {
+	if !errors.Is(err, ErrInvalidMessage) {
 		t.Fatal("expected invalid dry-run message to fail")
+	}
+	if got := ExitCode(err); got != ExitValidationError {
+		t.Errorf("ExitCode = %d, want %d", got, ExitValidationError)
 	}
 	if got, want := out.String(), "invalid message\n"; got != want {
 		t.Errorf("stdout = %q, want %q", got, want)
@@ -77,8 +80,12 @@ func TestYesRejectsInvalidMessageWithoutCommit(t *testing.T) {
 	deps.Config = &fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
 	deps.Provider = fakeFactory{provider: &fakeProvider{messages: []string{"invalid message"}}}
 
-	if err := execute(NewRootCommand(deps), "--yes"); err == nil {
-		t.Fatal("expected --yes with invalid message to fail")
+	err := execute(NewRootCommand(deps), "--yes")
+	if !errors.Is(err, ErrInvalidMessage) {
+		t.Fatalf("error = %v, want ErrInvalidMessage", err)
+	}
+	if got := ExitCode(err); got != ExitValidationError {
+		t.Errorf("ExitCode = %d, want %d", got, ExitValidationError)
 	}
 	if len(gitService.committed) != 0 {
 		t.Errorf("committed = %v, want no commits", gitService.committed)

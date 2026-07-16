@@ -25,7 +25,7 @@ func newConfigSetCommand(deps Dependencies) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
 		Short: "Update one or more configuration fields non-interactively",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags := cmd.Flags()
 			changed := flags.Changed("api-key") || flags.Changed("base-url") ||

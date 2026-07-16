@@ -12,7 +12,7 @@ func newConfigPathCommand(deps Dependencies) *cobra.Command {
 	return &cobra.Command{
 		Use:   "path",
 		Short: "Print the absolute path of the config file",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, err := deps.Config.Path()
 			if err != nil {
