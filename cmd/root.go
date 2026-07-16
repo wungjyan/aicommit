@@ -6,22 +6,29 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wungjyan/aicommit/internal/ai"
-	"github.com/wungjyan/aicommit/internal/config"
 	"github.com/wungjyan/aicommit/internal/git"
 	"github.com/wungjyan/aicommit/internal/prompt"
-	"github.com/wungjyan/aicommit/internal/ui"
 )
 
+// Build metadata, injected via -ldflags at build time. These stay as package
+// variables because ldflags can only patch package-level symbols; they are read
+// once in Execute and passed into the command tree as VersionInfo.
 var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "aicommit",
-	Short: "AI-powered Git commit message generator",
-	Long: `aicommit generates Conventional Commit messages using AI.
+// NewRootCommand builds a fresh command tree bound to the given dependencies.
+//
+// Every invocation returns an independent *cobra.Command with its flags bound to
+// command-local state, so tests can construct and run the tree repeatedly in one
+// process without global flag pollution.
+func NewRootCommand(deps Dependencies) *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   "aicommit",
+		Short: "AI-powered Git commit message generator",
+		Long: `aicommit generates Conventional Commit messages using AI.
 
 It reads your staged changes (git diff --cached) and uses your
 existing AI environment (API key or local CLI tool) to generate
@@ -30,51 +37,65 @@ a commit message following the Conventional Commits specification.
 Usage:
   git add .
   aicommit`,
-	RunE: run,
+		Args:          cobra.NoArgs,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd, deps)
+		},
+	}
+
+	rootCmd.SetIn(deps.In)
+	rootCmd.SetOut(deps.Out)
+	rootCmd.SetErr(deps.ErrOut)
+
+	rootCmd.AddCommand(newVersionCommand(deps))
+
+	return rootCmd
 }
 
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print version information",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("aicommit %s (commit: %s, built: %s)\n", version, commit, date)
-	},
+func newVersionCommand(deps Dependencies) *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			v := deps.Version
+			fmt.Fprintf(cmd.OutOrStdout(), "aicommit %s (commit: %s, built: %s)\n", v.Version, v.Commit, v.Date)
+			return nil
+		},
+	}
 }
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
-}
-
-func run(cmd *cobra.Command, args []string) error {
-	if err := git.IsGitRepo(); err != nil {
+func run(cmd *cobra.Command, deps Dependencies) error {
+	if err := deps.Git.IsGitRepo(); err != nil {
 		return err
 	}
 
-	diff, err := git.GetStagedDiff()
+	diff, err := deps.Git.GetStagedDiff()
 	if err != nil {
 		return err
 	}
 
 	diff = git.TruncateDiff(diff, 0) // 0 = use default limit
 
-	cfg, err := config.LoadConfig()
+	cfg, err := deps.Config.Load()
 	if err != nil {
 		return err
 	}
 
-	provider, err := ai.NewOpenAIProvider(cfg)
+	provider, err := deps.Provider.New(cfg)
 	if err != nil {
 		if errors.Is(err, ai.ErrNotConfigured) {
-			ui.Error("AI is not configured yet.")
-			fmt.Println()
-			ui.Info("Run `aicommit ai --setup` to set up your API key first.")
+			deps.UI.Error("AI is not configured yet.")
+			deps.UI.Info("Run `aicommit ai --setup` to set up your API key first.")
 			return nil
 		}
 		return err
 	}
 
 	var message string
-	spinErr := ui.Spinner("Generating commit message", func() error {
+	spinErr := deps.UI.Spinner("Generating commit message", func() error {
 		message, err = provider.Generate(cmd.Context(), diff)
 		return err
 	})
@@ -85,26 +106,26 @@ func run(cmd *cobra.Command, args []string) error {
 	for {
 		valid := prompt.ValidateMessage(message) == nil
 		if !valid {
-			ui.Warn("Message does not follow Conventional Commits format.")
+			deps.UI.Warn("Message does not follow Conventional Commits format.")
 		}
 
-		action, editedMsg, err := prompt.Confirm(message, valid)
+		action, editedMsg, err := deps.Confirm.Confirm(message, valid)
 		if err != nil {
 			return err
 		}
 
 		switch action {
 		case "commit":
-			if err := git.Commit(editedMsg); err != nil {
+			if err := deps.Git.Commit(editedMsg); err != nil {
 				return err
 			}
-			ui.Success("Committed: " + editedMsg)
+			deps.UI.Success("Committed: " + editedMsg)
 			return nil
 		case "edit":
 			message = editedMsg
 			continue
 		case "regenerate":
-			spinErr := ui.Spinner("Regenerating commit message", func() error {
+			spinErr := deps.UI.Spinner("Regenerating commit message", func() error {
 				message, err = provider.Generate(cmd.Context(), diff)
 				return err
 			})
@@ -113,26 +134,23 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 			continue
 		case "quit":
-			ui.Info("Aborted.")
+			deps.UI.Info("Aborted.")
 			return nil
 		}
 	}
 }
 
+// Execute builds the production command tree and runs it. Errors are printed via
+// the UI adapter for colored output, mirroring the previous behavior.
 func Execute() error {
-	// Silence cobra's default error printing so we can format it ourselves.
-	rootCmd.SilenceErrors = true
-	rootCmd.SilenceUsage = true
+	deps := productionDeps(VersionInfo{Version: version, Commit: commit, Date: date})
+
+	rootCmd := NewRootCommand(deps)
+	registerLegacyAICommand(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		ui.Error(err.Error())
+		deps.UI.Error(err.Error())
 		return err
 	}
 	return nil
-}
-
-func SetVersionInfo(v, c, d string) {
-	version = v
-	commit = c
-	date = d
 }

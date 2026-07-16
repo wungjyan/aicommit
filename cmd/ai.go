@@ -28,24 +28,32 @@ var presets = []preset{
 	{name: "Custom (enter manually)", baseURL: "", model: ""},
 }
 
-var aiCmd = &cobra.Command{
-	Use:   "ai",
-	Short: "Configure AI provider settings",
-	Long: `Configure your AI provider for commit message generation.
+// registerLegacyAICommand attaches the current `ai` command to the given root.
+//
+// This preserves existing behavior as the temporary baseline. The flag is bound
+// to command-local state (not a package global) so the command tree can be
+// rebuilt per construction without flag pollution. A later commit replaces this
+// with the `config` subcommand tree.
+func registerLegacyAICommand(root *cobra.Command) {
+	var setupMode bool
+
+	aiCmd := &cobra.Command{
+		Use:   "ai",
+		Short: "Configure AI provider settings",
+		Long: `Configure your AI provider for commit message generation.
 
 Without arguments, shows the current configuration.
 Use --setup to run the interactive setup wizard.`,
-	RunE: runAI,
-}
-
-var setupMode bool
-
-func init() {
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAI(setupMode)
+		},
+	}
 	aiCmd.Flags().BoolVar(&setupMode, "setup", false, "run interactive setup wizard")
-	rootCmd.AddCommand(aiCmd)
+	root.AddCommand(aiCmd)
 }
 
-func runAI(cmd *cobra.Command, args []string) error {
+func runAI(setupMode bool) error {
 	cfg, _ := config.LoadConfig()
 
 	if !setupMode {
