@@ -58,14 +58,17 @@ func TestNewProviderCodex(t *testing.T) {
 	}
 }
 
-// Claude remains unimplemented in this build and must report unavailable
-// without falling back to OpenAI.
-func TestNewProviderClaudeUnavailable(t *testing.T) {
+// Claude is implemented: the factory returns a ClaudeProvider without requiring
+// the CLI to be installed at construction time.
+func TestNewProviderClaude(t *testing.T) {
 	t.Setenv("AICOMMIT_BACKEND", "")
 
-	_, err := NewProvider(config.Config{Backend: config.BackendClaude})
-	if !errors.Is(err, ErrBackendUnavailable) {
-		t.Errorf("expected ErrBackendUnavailable, got %v", err)
+	p, err := NewProvider(config.Config{Backend: config.BackendClaude})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := p.(*ClaudeProvider); !ok {
+		t.Errorf("expected *ClaudeProvider, got %T", p)
 	}
 }
 
@@ -81,10 +84,14 @@ func TestNewProviderUnknownBackend(t *testing.T) {
 
 // AICOMMIT_BACKEND overrides the config file backend in the factory.
 func TestNewProviderBackendEnvOverride(t *testing.T) {
-	t.Setenv("AICOMMIT_BACKEND", "claude")
+	t.Setenv("AICOMMIT_BACKEND", "codex")
 
-	_, err := NewProvider(config.Config{Backend: config.BackendOpenAI, APIKey: "sk-test"})
-	if !errors.Is(err, ErrBackendUnavailable) {
-		t.Errorf("expected env backend claude -> ErrBackendUnavailable, got %v", err)
+	// Config says openai, but the env selects codex.
+	p, err := NewProvider(config.Config{Backend: config.BackendOpenAI, APIKey: "sk-test"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := p.(*CodexProvider); !ok {
+		t.Errorf("expected env backend codex -> *CodexProvider, got %T", p)
 	}
 }

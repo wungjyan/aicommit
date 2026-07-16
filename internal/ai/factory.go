@@ -8,22 +8,15 @@ import (
 	"github.com/wungjyan/aicommit/internal/config"
 )
 
-var (
-	// ErrUnknownBackend indicates a configured backend this build does not know.
-	// The factory never falls back to OpenAI on an unknown backend.
-	ErrUnknownBackend = errors.New("unknown AI backend")
-
-	// ErrBackendUnavailable indicates a known backend whose implementation is
-	// not wired up in this build yet.
-	ErrBackendUnavailable = errors.New("AI backend not available")
-)
+// ErrUnknownBackend indicates a configured backend this build does not know.
+// The factory never falls back to OpenAI on an unknown backend.
+var ErrUnknownBackend = errors.New("unknown AI backend")
 
 // NewProvider builds the Provider selected by the effective configuration.
 //
 // It resolves the backend through config.Resolve so the factory and the config
 // display command share one source of truth. Unknown backends return
-// ErrUnknownBackend; known-but-unimplemented backends return
-// ErrBackendUnavailable. Neither ever falls back to OpenAI.
+// ErrUnknownBackend and never fall back to OpenAI.
 func NewProvider(cfg config.Config) (Provider, error) {
 	eff := config.Resolve(cfg)
 
@@ -33,7 +26,7 @@ func NewProvider(cfg config.Config) (Provider, error) {
 	case config.BackendCodex:
 		return NewCodexProvider(eff.Language.Value), nil
 	case config.BackendClaude:
-		return nil, fmt.Errorf("%w: %q is planned but not implemented in this build", ErrBackendUnavailable, eff.Backend.Value)
+		return NewClaudeProvider(eff.Language.Value), nil
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnknownBackend, eff.Backend.Value)
 	}
