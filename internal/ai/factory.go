@@ -30,7 +30,9 @@ func NewProvider(cfg config.Config) (Provider, error) {
 	switch eff.Backend.Value {
 	case config.BackendOpenAI:
 		return newOpenAIFromEffective(eff)
-	case config.BackendCodex, config.BackendClaude:
+	case config.BackendCodex:
+		return NewCodexProvider(eff.Language.Value), nil
+	case config.BackendClaude:
 		return nil, fmt.Errorf("%w: %q is planned but not implemented in this build", ErrBackendUnavailable, eff.Backend.Value)
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnknownBackend, eff.Backend.Value)
