@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -22,8 +21,6 @@ var (
 )
 
 const (
-	defaultBaseURL = "https://api.openai.com/v1"
-	defaultModel   = "gpt-4o-mini"
 	defaultTimeout = 60 * time.Second
 )
 
@@ -36,46 +33,13 @@ type OpenAIProvider struct {
 	client   *http.Client
 }
 
-// NewOpenAIProvider creates a new OpenAI provider.
-// Priority: environment variables > cfg > built-in defaults.
+// NewOpenAIProvider creates a new OpenAI provider on the OpenAI backend.
+// Priority: environment variables > cfg > built-in defaults (via config.ResolveOpenAI).
 // Returns ErrNotConfigured when no API key is available from either source.
 var ErrNotConfigured = errors.New("API key not configured — run `aicommit ai` to set up")
 
 func NewOpenAIProvider(cfg config.Config) (*OpenAIProvider, error) {
-	apiKey := envOr("OPENAI_API_KEY", cfg.APIKey)
-	if apiKey == "" {
-		return nil, ErrNotConfigured
-	}
-
-	baseURL := envOr("OPENAI_BASE_URL", cfg.BaseURL)
-	if baseURL == "" {
-		baseURL = defaultBaseURL
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
-
-	model := envOr("OPENAI_MODEL", cfg.Model)
-	if model == "" {
-		model = defaultModel
-	}
-
-	language := envOr("AICOMMIT_LANGUAGE", cfg.Language)
-
-	return &OpenAIProvider{
-		apiKey:   apiKey,
-		baseURL:  baseURL,
-		model:    model,
-		language: language,
-		client: &http.Client{
-			Timeout: defaultTimeout,
-		},
-	}, nil
-}
-
-func envOr(envKey, fallback string) string {
-	if v := os.Getenv(envKey); v != "" {
-		return v
-	}
-	return fallback
+	return newOpenAIFromEffective(config.ResolveOpenAI(cfg))
 }
 
 // isTimeoutError checks whether an error (possibly wrapped in url.Error) is a timeout.
@@ -160,10 +124,7 @@ func (p *OpenAIProvider) Ping(ctx context.Context) error {
 }
 
 func (p *OpenAIProvider) Generate(ctx context.Context, diff string) (string, error) {
-	prompt := systemPrompt
-	if p.language != "" && p.language != "English" {
-		prompt += "\n\nWrite the commit message in " + p.language + "."
-	}
+	prompt := BuildPrompt(p.language)
 
 	reqBody := chatRequest{
 		Model: p.model,
@@ -241,47 +202,3 @@ func (p *OpenAIProvider) Generate(ctx context.Context, diff string) (string, err
 
 	return message, nil
 }
-
-var systemPrompt = `You are a commit message generator. Given a git diff, generate a Conventional Commit message.
-
-## Format
-
-<type>[optional scope]: <description>
-
-[optional body]
-
-## Rules
-
-- Follow the Conventional Commits specification strictly.
-- The first line (header) MUST be ≤ 72 characters.
-- Use imperative mood in the description: "add", "fix", "update" (not "added", "fixed", "updates").
-- Do not capitalise the first letter of the description.
-- Do not end the description with a period.
-- Scope is optional. Use it when it adds clarity (e.g. the name of a module, component, or file).
-- Choose the type that best represents the dominant change:
-  - feat     — a new feature
-  - fix      — a bug fix
-  - docs     — documentation only
-  - style    — formatting, whitespace (no logic change)
-  - refactor — code restructuring (no feature or fix)
-  - perf     — performance improvement
-  - test     — adding or updating tests
-  - chore    — build process, dependencies, tooling
-  - ci       — CI/CD configuration
-  - build    — build system or external dependencies
-- When the diff touches multiple areas, focus on the most impactful change.
-- Use a footer only for breaking changes: BREAKING CHANGE: <description>
-- Output ONLY the commit message. No markdown fences, no explanation, no extra text.
-
-## Examples
-
-feat(auth): add JWT refresh token validation
-fix(api): handle null response from user endpoint
-docs(readme): update installation instructions
-refactor(utils): extract common validation logic
-test(auth): add unit tests for login flow
-fix: resolve race condition in worker pool shutdown
-
-chore(deps): bump axios from 1.6.0 to 1.7.2
-
-BREAKING CHANGE: the --legacy flag has been removed`

@@ -15,7 +15,7 @@ func productionDeps(v VersionInfo) Dependencies {
 	return Dependencies{
 		Git:      gitAdapter{},
 		Config:   configAdapter{},
-		Provider: openAIFactory{},
+		Provider: providerFactory{},
 		UI:       uiAdapter{},
 		Confirm:  confirmAdapter{},
 		Version:  v,
@@ -32,12 +32,12 @@ type configAdapter struct{}
 
 func (configAdapter) Load() (config.Config, error) { return config.LoadConfig() }
 
-// openAIFactory builds the current OpenAI-compatible provider. Later commits
-// replace this with a backend-aware factory.
-type openAIFactory struct{}
+// providerFactory builds the backend-appropriate provider via the AI factory,
+// which dispatches on the effective backend and never falls back to OpenAI.
+type providerFactory struct{}
 
-func (openAIFactory) New(cfg config.Config) (Provider, error) {
-	return ai.NewOpenAIProvider(cfg)
+func (providerFactory) New(cfg config.Config) (Provider, error) {
+	return ai.NewProvider(cfg)
 }
 
 type uiAdapter struct{}

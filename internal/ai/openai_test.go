@@ -62,8 +62,8 @@ func TestNewOpenAIProvider(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if p.model != defaultModel {
-			t.Errorf("expected %q, got %q", defaultModel, p.model)
+		if p.model != config.DefaultModel {
+			t.Errorf("expected %q, got %q", config.DefaultModel, p.model)
 		}
 	})
 }
@@ -259,4 +259,3 @@ func TestPing(t *testing.T) {
 		}
 	})
 }
-

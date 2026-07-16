@@ -83,6 +83,14 @@ func Resolve(cfg Config) Effective {
 	return resolveWith(cfg, os.Getenv)
 }
 
+// ResolveOpenAI resolves the OpenAI-backend fields (API key, base URL, model)
+// and language regardless of the configured backend. It backs the explicit
+// OpenAI constructor and connection verification, which always operate on the
+// OpenAI backend.
+func ResolveOpenAI(cfg Config) Effective {
+	return resolveOpenAIWith(cfg, os.Getenv)
+}
+
 // resolveWith is the testable core of Resolve; getenv is injected so tests can
 // exercise environment precedence without mutating process state.
 func resolveWith(cfg Config, getenv func(string) string) Effective {
@@ -97,22 +105,39 @@ func resolveWith(cfg Config, getenv func(string) string) Effective {
 
 	eff := Effective{Backend: backend, Language: language}
 
-	// API-key, base URL and model only apply to the OpenAI backend. Non-OpenAI
-	// backends inherit their CLI's own model and never expose these fields.
-	if backend.Value == BackendOpenAI {
-		eff.APIKey = resolveOptional(getenv(EnvAPIKey), cfg.APIKey)
-
-		baseURL := resolveField(getenv(EnvBaseURL), cfg.BaseURL, DefaultBaseURL)
-		baseURL.Value = strings.TrimRight(baseURL.Value, "/")
-		eff.BaseURL = baseURL
-
-		eff.Model = resolveField(getenv(EnvModel), cfg.Model, DefaultModel)
-	} else if backend.Value == BackendCodex || backend.Value == BackendClaude {
+	switch backend.Value {
+	case BackendOpenAI:
+		applyOpenAIFields(&eff, cfg, getenv)
+	case BackendCodex, BackendClaude:
 		// The model is managed by the local CLI, not by aicommit config.
 		eff.Model = Value{Source: SourceCLI}
 	}
 
 	return eff
+}
+
+// resolveOpenAIWith resolves the OpenAI fields and language, forcing the OpenAI
+// backend. Used when the caller already knows it wants the OpenAI backend.
+func resolveOpenAIWith(cfg Config, getenv func(string) string) Effective {
+	eff := Effective{
+		Backend:  Value{Value: BackendOpenAI, Source: SourceDefault},
+		Language: resolveField(getenv(EnvLanguage), cfg.Language, DefaultLanguage),
+	}
+	applyOpenAIFields(&eff, cfg, getenv)
+	return eff
+}
+
+// applyOpenAIFields fills the API key, base URL and model on eff using the
+// env > config > default priority. API-key has no default so a missing key
+// stays empty (treated as "not configured").
+func applyOpenAIFields(eff *Effective, cfg Config, getenv func(string) string) {
+	eff.APIKey = resolveOptional(getenv(EnvAPIKey), cfg.APIKey)
+
+	baseURL := resolveField(getenv(EnvBaseURL), cfg.BaseURL, DefaultBaseURL)
+	baseURL.Value = strings.TrimRight(baseURL.Value, "/")
+	eff.BaseURL = baseURL
+
+	eff.Model = resolveField(getenv(EnvModel), cfg.Model, DefaultModel)
 }
 
 // resolveField picks env > config > default and reports the winning source.
