@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/wungjyan/aicommit/internal/ai"
 	"github.com/wungjyan/aicommit/internal/config"
 )
 
@@ -21,6 +22,7 @@ type Dependencies struct {
 	Git      GitService
 	Config   ConfigStore
 	Provider ProviderFactory
+	Backend  BackendService
 	UI       UI
 	Confirm  Confirmer
 
@@ -41,9 +43,20 @@ type GitService interface {
 	Commit(message string) error
 }
 
-// ConfigStore abstracts reading the persisted configuration.
+// ConfigStore abstracts reading and writing the persisted configuration.
 type ConfigStore interface {
 	Load() (config.Config, error)
+	Save(cfg config.Config) error
+	Path() (string, error)
+}
+
+// BackendService abstracts backend connectivity checks and credential-free
+// status snapshots, so the config commands never embed CLI details directly.
+type BackendService interface {
+	// Check verifies the effective backend end-to-end (OpenAI ping / CLI login).
+	Check(ctx context.Context, cfg config.Config) error
+	// Status returns a non-failing, credential-free status for display.
+	Status(cfg config.Config) ai.CLIStatus
 }
 
 // Provider generates a commit message from a staged diff.

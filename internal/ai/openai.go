@@ -36,7 +36,7 @@ type OpenAIProvider struct {
 // NewOpenAIProvider creates a new OpenAI provider on the OpenAI backend.
 // Priority: environment variables > cfg > built-in defaults (via config.ResolveOpenAI).
 // Returns ErrNotConfigured when no API key is available from either source.
-var ErrNotConfigured = errors.New("API key not configured — run `aicommit ai` to set up")
+var ErrNotConfigured = errors.New("API key not configured — run `aicommit config setup` to set up")
 
 func NewOpenAIProvider(cfg config.Config) (*OpenAIProvider, error) {
 	return newOpenAIFromEffective(config.ResolveOpenAI(cfg))

@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/wungjyan/aicommit/internal/ai"
@@ -50,6 +51,7 @@ Usage:
 	rootCmd.SetErr(deps.ErrOut)
 
 	rootCmd.AddCommand(newVersionCommand(deps))
+	rootCmd.AddCommand(newConfigCommand(deps))
 
 	return rootCmd
 }
@@ -88,7 +90,7 @@ func run(cmd *cobra.Command, deps Dependencies) error {
 	if err != nil {
 		if errors.Is(err, ai.ErrNotConfigured) {
 			deps.UI.Error("AI is not configured yet.")
-			deps.UI.Info("Run `aicommit ai --setup` to set up your API key first.")
+			deps.UI.Info("Run `aicommit config setup` to set up your API key first.")
 			return nil
 		}
 		return err
@@ -144,9 +146,11 @@ func run(cmd *cobra.Command, deps Dependencies) error {
 // the UI adapter for colored output, mirroring the previous behavior.
 func Execute() error {
 	deps := productionDeps(VersionInfo{Version: version, Commit: commit, Date: date})
+	deps.In = os.Stdin
+	deps.Out = os.Stdout
+	deps.ErrOut = os.Stderr
 
 	rootCmd := NewRootCommand(deps)
-	registerLegacyAICommand(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		deps.UI.Error(err.Error())

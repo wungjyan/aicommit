@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/wungjyan/aicommit/internal/ai"
 	"github.com/wungjyan/aicommit/internal/config"
 	"github.com/wungjyan/aicommit/internal/git"
@@ -16,6 +18,7 @@ func productionDeps(v VersionInfo) Dependencies {
 		Git:      gitAdapter{},
 		Config:   configAdapter{},
 		Provider: providerFactory{},
+		Backend:  backendAdapter{},
 		UI:       uiAdapter{},
 		Confirm:  confirmAdapter{},
 		Version:  v,
@@ -31,6 +34,19 @@ func (gitAdapter) Commit(message string) error    { return git.Commit(message) }
 type configAdapter struct{}
 
 func (configAdapter) Load() (config.Config, error) { return config.LoadConfig() }
+func (configAdapter) Save(cfg config.Config) error { return config.SaveConfig(cfg) }
+func (configAdapter) Path() (string, error)        { return config.ConfigPath() }
+
+// backendAdapter routes backend checks and status queries to the AI package,
+// keeping CLI details out of the command layer.
+type backendAdapter struct{}
+
+func (backendAdapter) Check(ctx context.Context, cfg config.Config) error {
+	return ai.Check(ctx, cfg)
+}
+func (backendAdapter) Status(cfg config.Config) ai.CLIStatus {
+	return ai.Status(cfg)
+}
 
 // providerFactory builds the backend-appropriate provider via the AI factory,
 // which dispatches on the effective backend and never falls back to OpenAI.

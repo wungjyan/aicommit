@@ -33,6 +33,12 @@ func configPath() (string, error) {
 	return filepath.Join(home, configDir, configFile), nil
 }
 
+// ConfigPath returns the absolute path of the config file. It is the stable
+// public accessor used by `aicommit config path`.
+func ConfigPath() (string, error) {
+	return configPath()
+}
+
 // LoadConfig reads the config file. Returns a zero Config (not an error) if the file does not exist.
 func LoadConfig() (Config, error) {
 	path, err := configPath()
@@ -55,7 +61,9 @@ func LoadConfig() (Config, error) {
 	return cfg, nil
 }
 
-// SaveConfig writes the config file, creating the directory if needed.
+// SaveConfig writes the config file atomically, creating the directory if
+// needed. It writes to a temp file in the same directory and renames it into
+// place, so a failed or interrupted write never corrupts the existing config.
 func SaveConfig(cfg Config) error {
 	path, err := configPath()
 	if err != nil {
@@ -72,8 +80,28 @@ func SaveConfig(cfg Config) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	tmp, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp config: %w", err)
+	}
+	tmpName := tmp.Name()
+	// Best-effort cleanup if we fail before the rename succeeds.
+	defer os.Remove(tmpName)
+
+	if err := tmp.Chmod(0600); err != nil {
+		tmp.Close()
+		return fmt.Errorf("failed to set config permissions: %w", err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
 		return fmt.Errorf("failed to write config: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
 	}
 	return nil
 }

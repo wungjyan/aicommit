@@ -105,7 +105,7 @@ func TestRunCommitsGeneratedMessage(t *testing.T) {
 	deps, _, _ := testDeps()
 	git := &fakeGit{diff: "diff --git a b"}
 	deps.Git = git
-	deps.Config = fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
+	deps.Config = &fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
 	deps.Provider = fakeFactory{provider: &fakeProvider{messages: []string{"feat: add feature"}}}
 	deps.Confirm = &scriptedConfirm{actions: []confirmStep{{action: "commit"}}}
 
@@ -123,7 +123,7 @@ func TestRunQuitDoesNotCommit(t *testing.T) {
 	deps, _, _ := testDeps()
 	git := &fakeGit{diff: "diff"}
 	deps.Git = git
-	deps.Config = fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
+	deps.Config = &fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
 	deps.Confirm = &scriptedConfirm{actions: []confirmStep{{action: "quit"}}}
 
 	cmd := NewRootCommand(deps)
@@ -141,7 +141,7 @@ func TestRunRegenerateReusesDiff(t *testing.T) {
 	git := &fakeGit{diff: "diff"}
 	provider := &fakeProvider{messages: []string{"feat: first", "feat: second"}}
 	deps.Git = git
-	deps.Config = fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
+	deps.Config = &fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
 	deps.Provider = fakeFactory{provider: provider}
 	deps.Confirm = &scriptedConfirm{actions: []confirmStep{
 		{action: "regenerate"},

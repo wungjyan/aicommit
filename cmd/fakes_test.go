@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/wungjyan/aicommit/internal/ai"
 	"github.com/wungjyan/aicommit/internal/config"
 )
 
@@ -36,13 +37,46 @@ func (f *fakeGit) Commit(message string) error {
 	return nil
 }
 
-// fakeConfig returns a canned configuration.
+// fakeConfig returns a canned configuration and records saves.
 type fakeConfig struct {
-	cfg config.Config
-	err error
+	cfg     config.Config
+	err     error
+	saveErr error
+
+	saved   []config.Config
+	path    string
+	pathErr error
 }
 
-func (f fakeConfig) Load() (config.Config, error) { return f.cfg, f.err }
+func (f *fakeConfig) Load() (config.Config, error) { return f.cfg, f.err }
+
+func (f *fakeConfig) Save(cfg config.Config) error {
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	f.saved = append(f.saved, cfg)
+	f.cfg = cfg
+	return nil
+}
+
+func (f *fakeConfig) Path() (string, error) {
+	if f.pathErr != nil {
+		return "", f.pathErr
+	}
+	if f.path == "" {
+		return "/tmp/aicommit/config.json", nil
+	}
+	return f.path, nil
+}
+
+// fakeBackend is a stub BackendService for command tests.
+type fakeBackend struct {
+	checkErr error
+	status   ai.CLIStatus
+}
+
+func (f fakeBackend) Check(ctx context.Context, cfg config.Config) error { return f.checkErr }
+func (f fakeBackend) Status(cfg config.Config) ai.CLIStatus              { return f.status }
 
 // fakeProvider yields queued messages and records how many times Generate ran.
 type fakeProvider struct {
@@ -132,8 +166,9 @@ func testDeps() (Dependencies, *bytes.Buffer, *bytes.Buffer) {
 		Out:      &out,
 		ErrOut:   &errOut,
 		Git:      &fakeGit{},
-		Config:   fakeConfig{},
+		Config:   &fakeConfig{},
 		Provider: fakeFactory{provider: &fakeProvider{messages: []string{"feat: add thing"}}},
+		Backend:  fakeBackend{},
 		UI:       &recordingUI{},
 		Confirm:  &scriptedConfirm{},
 		Version:  VersionInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-07-16T00:00:00Z"},
