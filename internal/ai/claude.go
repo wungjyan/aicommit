@@ -11,9 +11,9 @@ import (
 // claudeBin is the Claude Code CLI executable name.
 const claudeBin = "claude"
 
-// ClaudeProvider generates commit messages through the user's authenticated
+// ClaudeProvider generates commit messages through the user's configured
 // Claude Code CLI. It never reads or persists Claude credentials; it inherits
-// the CLI's own authentication and model configuration.
+// the CLI's own authentication and model-provider configuration.
 type ClaudeProvider struct {
 	runner   CommandRunner
 	language string
@@ -41,9 +41,17 @@ func (p *ClaudeProvider) resolveBin() (string, error) {
 	}
 	path, err := lookPath(claudeBin)
 	if err != nil {
-		return "", fmt.Errorf("%w: install the Claude Code CLI and run `claude` to log in", ErrCLINotInstalled)
+		return "", fmt.Errorf("%w: install Claude Code and ensure `claude` is available on PATH", ErrCLINotInstalled)
 	}
 	return path, nil
+}
+
+// CheckInstalled verifies only that the Claude executable is available. Login
+// and custom model-provider configuration are intentionally left to Claude and
+// are exercised by Generate.
+func (p *ClaudeProvider) CheckInstalled() error {
+	_, err := p.resolveBin()
+	return err
 }
 
 // Generate runs Claude Code non-interactively with all tools disabled and no

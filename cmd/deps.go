@@ -52,10 +52,10 @@ type ConfigStore interface {
 	Path() (string, error)
 }
 
-// BackendService abstracts backend connectivity checks and credential-free
+// BackendService abstracts backend prerequisite checks and credential-free
 // status snapshots, so the config commands never embed CLI details directly.
 type BackendService interface {
-	// Check verifies the effective backend end-to-end (OpenAI ping / CLI login).
+	// Check verifies what aicommit owns: OpenAI connectivity or CLI installation.
 	Check(ctx context.Context, cfg config.Config) error
 	// Status returns a non-failing, credential-free status for display.
 	Status(cfg config.Config) ai.CLIStatus

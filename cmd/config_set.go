@@ -64,13 +64,16 @@ func newConfigSetCommand(deps Dependencies) *cobra.Command {
 				ctx, cancel := context.WithTimeout(cmd.Context(), configCheckTimeout)
 				defer cancel()
 				var checkErr error
-				_ = deps.UI.Spinner("Verifying configuration", func() error {
+				_ = deps.UI.Spinner(backendCheckLabel(cfg), func() error {
 					checkErr = deps.Backend.Check(ctx, cfg)
 					return checkErr
 				})
 				if checkErr != nil {
 					// Do not overwrite the existing config on a failed check.
 					return fmt.Errorf("configuration check failed, config not saved: %w", checkErr)
+				}
+				if !config.Resolve(cfg).IsOpenAI() {
+					deps.UI.Info(backendCheckSuccess(cfg))
 				}
 			}
 
@@ -88,7 +91,7 @@ func newConfigSetCommand(deps Dependencies) *cobra.Command {
 	f.StringVar(&model, "model", "", "model name")
 	f.StringVar(&backend, "backend", "", "AI backend: openai, codex or claude")
 	f.StringVar(&language, "language", "", "commit message language")
-	f.BoolVar(&check, "check", false, "verify the configuration before saving")
+	f.BoolVar(&check, "check", false, "verify API connectivity or local CLI installation before saving")
 
 	return cmd
 }

@@ -92,11 +92,26 @@ func TestClaudeNotInstalled(t *testing.T) {
 	if _, err := p.Generate(context.Background(), "diff"); !errors.Is(err, ErrCLINotInstalled) {
 		t.Errorf("Generate: expected ErrCLINotInstalled, got %v", err)
 	}
+	if err := p.CheckInstalled(); !errors.Is(err, ErrCLINotInstalled) {
+		t.Errorf("CheckInstalled: expected ErrCLINotInstalled, got %v", err)
+	}
 	if err := p.CheckAuth(context.Background()); !errors.Is(err, ErrCLINotInstalled) {
 		t.Errorf("CheckAuth: expected ErrCLINotInstalled, got %v", err)
 	}
 	if _, ok := p.Installed(); ok {
 		t.Error("Installed() = true, want false")
+	}
+}
+
+func TestClaudeCheckInstalledDoesNotProbeAuth(t *testing.T) {
+	runner := &fakeRunner{err: ErrCLINotAuthenticated}
+	p := claudeTestProvider(runner)
+
+	if err := p.CheckInstalled(); err != nil {
+		t.Fatalf("CheckInstalled returned error: %v", err)
+	}
+	if runner.lastSpec.Name != "" {
+		t.Errorf("installation check unexpectedly ran command: %+v", runner.lastSpec)
 	}
 }
 

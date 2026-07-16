@@ -11,7 +11,9 @@ var (
 	// ErrCLINotInstalled indicates the backend's CLI is not on PATH.
 	ErrCLINotInstalled = errors.New("AI CLI not installed")
 
-	// ErrCLINotAuthenticated indicates the backend's CLI has no valid login.
+	// ErrCLINotAuthenticated indicates the CLI's own status command did not
+	// report an active login. A separately configured custom provider may still
+	// be usable, so this error is informational during configuration.
 	ErrCLINotAuthenticated = errors.New("AI CLI not authenticated")
 
 	// ErrEmptyMessage indicates the CLI produced no usable commit message.

@@ -44,9 +44,11 @@ func TestSetupBackendOnlyPreservesLanguage(t *testing.T) {
 	deps, _, _ := testDeps()
 	fc := &fakeConfig{cfg: config.Config{Backend: "openai", Language: "中文"}}
 	deps.Config = fc
-	deps.Backend = fakeBackend{checkErr: nil} // verification passes
+	deps.Backend = fakeBackend{checkErr: nil} // CLI installation check passes
+	ui := &recordingUI{}
+	deps.UI = ui
 
-	// "1" backend group, "2" Codex backend (no further prompts, auth verified).
+	// "1" backend group, "2" Codex backend (no further prompts).
 	if err := runSetup(t, deps, "1\n2\n"); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
@@ -59,6 +61,9 @@ func TestSetupBackendOnlyPreservesLanguage(t *testing.T) {
 	}
 	if saved.Language != "中文" {
 		t.Errorf("backend-only setup dropped language: %q", saved.Language)
+	}
+	if len(ui.infos) != 1 || !strings.Contains(ui.infos[0], "will be checked when generating") {
+		t.Errorf("missing deferred provider-check explanation: %v", ui.infos)
 	}
 }
 

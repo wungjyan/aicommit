@@ -142,6 +142,9 @@ func TestCodexNotInstalled(t *testing.T) {
 	if _, err := p.Generate(context.Background(), "diff"); !errors.Is(err, ErrCLINotInstalled) {
 		t.Errorf("Generate: expected ErrCLINotInstalled, got %v", err)
 	}
+	if err := p.CheckInstalled(); !errors.Is(err, ErrCLINotInstalled) {
+		t.Errorf("CheckInstalled: expected ErrCLINotInstalled, got %v", err)
+	}
 	if err := p.CheckAuth(context.Background()); !errors.Is(err, ErrCLINotInstalled) {
 		t.Errorf("CheckAuth: expected ErrCLINotInstalled, got %v", err)
 	}
@@ -150,8 +153,23 @@ func TestCodexNotInstalled(t *testing.T) {
 	}
 }
 
+func TestCodexCheckInstalledDoesNotProbeAuth(t *testing.T) {
+	runner := &fakeRunner{err: ErrCLINotAuthenticated}
+	p := codexTestProvider(runner)
+
+	if err := p.CheckInstalled(); err != nil {
+		t.Fatalf("CheckInstalled returned error: %v", err)
+	}
+	if runner.lastSpec.Name != "" {
+		t.Errorf("installation check unexpectedly ran command: %+v", runner.lastSpec)
+	}
+}
+
 func TestCodexCheckAuthAuthenticated(t *testing.T) {
-	runner := &fakeRunner{result: CommandResult{Stdout: "Logged in using ChatGPT\n", ExitCode: 0}}
+	// Codex CLI 0.144.4 writes the human-readable login status to stderr.
+	// Authentication is determined by the successful exit code, not its stream
+	// or wording.
+	runner := &fakeRunner{result: CommandResult{Stderr: "Logged in using ChatGPT\n", ExitCode: 0}}
 	p := codexTestProvider(runner)
 
 	if err := p.CheckAuth(context.Background()); err != nil {
@@ -163,7 +181,7 @@ func TestCodexCheckAuthAuthenticated(t *testing.T) {
 }
 
 func TestCodexCheckAuthUnauthenticated(t *testing.T) {
-	// Non-zero exit / no "Logged in" line => unauthenticated.
+	// A non-zero exit indicates that the CLI is not authenticated.
 	runner := &fakeRunner{result: CommandResult{Stdout: "Not logged in", ExitCode: 1}}
 	p := codexTestProvider(runner)
 

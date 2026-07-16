@@ -171,17 +171,20 @@ func configureOpenAI(cmd *cobra.Command, deps Dependencies, w *wizard, cfg confi
 	return newCfg, nil
 }
 
-// configureCLIBackend selects a local CLI backend and verifies its auth. It
-// keeps existing OpenAI fields for later reuse but they will not be shown or run.
+// configureCLIBackend selects a local CLI backend and verifies only that its
+// executable is installed. Authentication and provider configuration remain
+// owned by the CLI and are exercised by the first generation call. Existing
+// OpenAI fields are kept for later reuse but are not shown or used.
 func configureCLIBackend(cmd *cobra.Command, deps Dependencies, w *wizard, cfg config.Config, backend string) (config.Config, error) {
 	newCfg := cfg
 	newCfg.Backend = backend
 
 	w.line("")
-	w.line(fmt.Sprintf("Verifying %s CLI authentication...", backend))
+	w.line(fmt.Sprintf("Checking %s installation...", cliBackendName(backend)))
 	if err := verifyBackend(cmd, deps, config.Config{Backend: backend, Language: cfg.Language}); err != nil {
 		return config.Config{}, err
 	}
+	deps.UI.Info(backendCheckSuccess(config.Config{Backend: backend}))
 	return newCfg, nil
 }
 
@@ -191,7 +194,7 @@ func verifyBackend(cmd *cobra.Command, deps Dependencies, cfg config.Config) err
 	defer cancel()
 
 	var checkErr error
-	_ = deps.UI.Spinner("Verifying", func() error {
+	_ = deps.UI.Spinner(backendCheckLabel(cfg), func() error {
 		checkErr = deps.Backend.Check(ctx, cfg)
 		return checkErr
 	})

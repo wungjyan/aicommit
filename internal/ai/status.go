@@ -12,8 +12,10 @@ import (
 type CLIStatus struct {
 	Installed bool
 	Path      string // executable path when installed
-	// Auth is one of "authenticated", "unauthenticated", "unknown" (probe error
-	// or timeout), or "" when the backend is not a local CLI.
+	// Auth is the CLI's informational login report. It is one of
+	// "authenticated", "unauthenticated", "unknown" (probe error or timeout),
+	// or "" when the backend is not a local CLI. It is never a configuration
+	// gate because custom providers may use separate credentials.
 	Auth string
 }
 
@@ -26,12 +28,15 @@ const (
 // localCLI is the shared behavior of the Codex and Claude providers.
 type localCLI interface {
 	Installed() (string, bool)
+	CheckInstalled() error
 	CheckAuth(ctx context.Context) error
 }
 
-// Check verifies the effective backend end-to-end for `aicommit config check`.
-// OpenAI performs a Chat Completions ping; Codex/Claude verify install + login.
-// It never mutates configuration.
+// Check verifies the prerequisites owned by aicommit without mutating
+// configuration. OpenAI performs a Chat Completions ping because aicommit owns
+// that API configuration. Codex and Claude only require their CLI to be
+// installed; authentication and provider configuration belong to those CLIs
+// and are verified by the first real generation call.
 func Check(ctx context.Context, cfg config.Config) error {
 	eff := config.Resolve(cfg)
 	switch eff.Backend.Value {
@@ -42,9 +47,9 @@ func Check(ctx context.Context, cfg config.Config) error {
 		}
 		return p.Ping(ctx)
 	case config.BackendCodex:
-		return NewCodexProvider(eff.Language.Value).CheckAuth(ctx)
+		return NewCodexProvider(eff.Language.Value).CheckInstalled()
 	case config.BackendClaude:
-		return NewClaudeProvider(eff.Language.Value).CheckAuth(ctx)
+		return NewClaudeProvider(eff.Language.Value).CheckInstalled()
 	default:
 		return errUnknownBackend(eff.Backend.Value)
 	}

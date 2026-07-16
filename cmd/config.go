@@ -121,13 +121,16 @@ func cliPathText(st ai.CLIStatus) string {
 }
 
 func cliAuthText(st ai.CLIStatus) string {
+	if !st.Installed {
+		return "unavailable (CLI not installed)"
+	}
 	switch st.Auth {
 	case ai.AuthAuthenticated:
-		return "authenticated"
+		return "available (reported by CLI)"
 	case ai.AuthUnauthenticated:
-		return "unauthenticated"
+		return "not detected (custom provider may still work)"
 	default:
-		return "unknown"
+		return "status unavailable (checked when generating)"
 	}
 }
 

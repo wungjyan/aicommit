@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 )
 
@@ -15,9 +14,9 @@ const codexBin = "codex"
 // cliGenerateTimeout bounds a single CLI generation call.
 const cliGenerateTimeout = 60 * time.Second
 
-// CodexProvider generates commit messages through the user's authenticated
-// Codex CLI. It never reads or persists Codex credentials; it inherits the
-// CLI's own authentication and model configuration.
+// CodexProvider generates commit messages through the user's configured Codex
+// CLI. It never reads or persists Codex credentials; it inherits the CLI's own
+// authentication and model-provider configuration.
 type CodexProvider struct {
 	runner   CommandRunner
 	language string
@@ -45,9 +44,17 @@ func (p *CodexProvider) resolveBin() (string, error) {
 	}
 	path, err := lookPath(codexBin)
 	if err != nil {
-		return "", fmt.Errorf("%w: install the Codex CLI and run `codex login`", ErrCLINotInstalled)
+		return "", fmt.Errorf("%w: install the Codex CLI and ensure `codex` is available on PATH", ErrCLINotInstalled)
 	}
 	return path, nil
+}
+
+// CheckInstalled verifies only that the Codex executable is available. Login
+// and custom model-provider configuration are intentionally left to Codex and
+// are exercised by Generate.
+func (p *CodexProvider) CheckInstalled() error {
+	_, err := p.resolveBin()
+	return err
 }
 
 // Generate runs Codex non-interactively in a read-only sandbox. The generation
@@ -108,7 +115,8 @@ func (p *CodexProvider) Generate(ctx context.Context, diff string) (string, erro
 }
 
 // CheckAuth verifies the Codex CLI is installed and logged in via
-// `codex login status` (authenticated => stdout "Logged in using ..." + exit 0).
+// `codex login status`. A zero exit code is authoritative; current Codex
+// versions may write the human-readable status to stderr instead of stdout.
 func (p *CodexProvider) CheckAuth(ctx context.Context) error {
 	bin, err := p.resolveBin()
 	if err != nil {
@@ -122,7 +130,7 @@ func (p *CodexProvider) CheckAuth(ctx context.Context) error {
 		Name: bin,
 		Args: []string{"login", "status"},
 	})
-	if runErr == nil && res.ExitCode == 0 && strings.Contains(res.Stdout, "Logged in") {
+	if runErr == nil && res.ExitCode == 0 {
 		return nil
 	}
 	return fmt.Errorf("%w: run `codex login` to authenticate", ErrCLINotAuthenticated)

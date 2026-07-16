@@ -53,8 +53,21 @@ func TestConfigDisplayCodexHidesAPIFields(t *testing.T) {
 	if !strings.Contains(got, "CLI      : /usr/bin/codex") {
 		t.Errorf("missing CLI path:\n%s", got)
 	}
-	if !strings.Contains(got, "Auth     : authenticated") {
+	if !strings.Contains(got, "Auth     : available (reported by CLI)") {
 		t.Errorf("missing auth status:\n%s", got)
+	}
+}
+
+func TestConfigDisplayCodexLoginNotDetectedIsInformational(t *testing.T) {
+	deps, out, _ := testDeps()
+	deps.Config = &fakeConfig{cfg: config.Config{Backend: "codex"}}
+	deps.Backend = fakeBackend{status: ai.CLIStatus{Installed: true, Path: "/usr/bin/codex", Auth: ai.AuthUnauthenticated}}
+
+	if err := runConfig(t, deps); err != nil {
+		t.Fatalf("config: %v", err)
+	}
+	if got := out.String(); !strings.Contains(got, "not detected (custom provider may still work)") {
+		t.Errorf("expected friendly custom-provider hint:\n%s", got)
 	}
 }
 
@@ -189,6 +202,22 @@ func TestConfigCheckSuccess(t *testing.T) {
 	}
 	if len(ui.success) == 0 {
 		t.Error("expected a success message")
+	}
+}
+
+func TestConfigCheckCLISuccessExplainsDeferredProviderCheck(t *testing.T) {
+	deps, _, _ := testDeps()
+	deps.Config = &fakeConfig{cfg: config.Config{Backend: "codex"}}
+	deps.Backend = fakeBackend{checkErr: nil}
+	ui := &recordingUI{}
+	deps.UI = ui
+
+	cmd := NewRootCommand(deps)
+	if err := execute(cmd, "config", "check"); err != nil {
+		t.Fatalf("config check: %v", err)
+	}
+	if len(ui.success) != 1 || !strings.Contains(ui.success[0], "will be checked when generating") {
+		t.Errorf("unexpected success message: %v", ui.success)
 	}
 }
 
