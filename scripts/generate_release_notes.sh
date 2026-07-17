@@ -4,55 +4,61 @@ set -euo pipefail
 
 current_tag="${1:-}"
 output_file="${2:-release-notes.md}"
+version="${current_tag#v}"
+changelog="CHANGELOG.md"
 
-if [[ -z "${current_tag}" ]]; then
+if [[ -z "$current_tag" || "$version" == "$current_tag" ]]; then
   echo "usage: $0 <current-tag> [output-file]" >&2
   exit 1
 fi
+[[ -f "$changelog" ]] || { echo "missing $changelog" >&2; exit 1; }
 
 repo_slug="${GITHUB_REPOSITORY:-}"
-if [[ -z "${repo_slug}" ]]; then
+if [[ -z "$repo_slug" ]]; then
   remote_url="$(git remote get-url origin 2>/dev/null || true)"
-  repo_slug="$(printf '%s' "${remote_url}" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
+  repo_slug="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
 fi
 
-previous_tag="$(git tag --sort=-version:refname | grep -Fxv "${current_tag}" | head -n 1 || true)"
-
-if [[ -n "${previous_tag}" ]]; then
-  range="${previous_tag}..${current_tag}"
-  compare_url="https://github.com/${repo_slug}/compare/${previous_tag}...${current_tag}"
+previous_tag="$(git tag --merged "$current_tag" --sort=-version:refname | grep -Fxv "$current_tag" | head -n 1 || true)"
+if [[ -n "$previous_tag" ]]; then
+  compare_url="https://github.com/$repo_slug/compare/$previous_tag...$current_tag"
 else
-  range="${current_tag}"
-  compare_url="https://github.com/${repo_slug}/commits/${current_tag}"
+  compare_url="https://github.com/$repo_slug/commits/$current_tag"
 fi
 
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "${tmpdir}"' EXIT
+awk -v version="$version" '
+  function matches_version(heading) {
+    return heading == version || index(heading, version " ") == 1 ||
+      heading == "[" version "]" || index(heading, "[" version "] ") == 1
+  }
 
-write_section() {
-  local title="$1"
-  local pattern="$2"
-  local file="$3"
+  /^##[[:space:]]+/ {
+    heading = $0
+    sub(/^##[[:space:]]+/, "", heading)
+    if (found) {
+      exit
+    }
+    if (matches_version(heading)) {
+      found = 1
+    }
+  }
 
-  git log --no-merges --pretty=format:'- %s (%h)' "${range}" -- \
-    > /dev/null 2>&1 || true
+  found {
+    print
+  }
 
-  git log --no-merges --pretty=format:'- %s (%h)' "${range}" \
-    | grep -E "${pattern}" > "${file}" || true
-
-  if [[ -s "${file}" ]]; then
-    {
-      echo "## ${title}"
-      echo
-      cat "${file}"
-      echo
-    } >> "${output_file}"
-  fi
+  END {
+    if (!found) {
+      exit 2
+    }
+  }
+' "$changelog" > "$output_file" || {
+  echo "unable to find release notes for version $version in $changelog" >&2
+  exit 1
 }
 
-other_file="${tmpdir}/other.txt"
+cat >> "$output_file" <<'EOF'
 
-cat > "${output_file}" <<'EOF'
 ## Installation
 
 **macOS / Linux**
@@ -76,18 +82,16 @@ npm install -g @wungjyan/aicommit
 ```bash
 go install github.com/wungjyan/aicommit@latest
 ```
-
 EOF
 
-write_section "Features" '^[[:space:]]*-[[:space:]]*feat(\(.+\))?:' "${tmpdir}/features.txt"
-write_section "Fixes" '^[[:space:]]*-[[:space:]]*fix(\(.+\))?:' "${tmpdir}/fixes.txt"
 {
+  echo
   echo "## Full Changelog"
   echo
-  if [[ -n "${previous_tag}" ]]; then
-    echo "[${previous_tag}...${current_tag}](${compare_url})"
+  if [[ -n "$previous_tag" ]]; then
+    echo "[$previous_tag...$current_tag]($compare_url)"
   else
-    echo "[View commit history](${compare_url})"
+    echo "[View commit history]($compare_url)"
   fi
   echo
-} >> "${output_file}"
+} >> "$output_file"
