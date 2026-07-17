@@ -60,6 +60,8 @@ cat > "${output_file}" <<'EOF'
 curl -fsSL https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.sh | sh
 ```
 
+Installs to `~/.local/bin` without administrator access. The installer prints PATH setup instructions when needed.
+
 **Windows (PowerShell)**
 ```powershell
 irm https://raw.githubusercontent.com/wungjyan/aicommit/main/scripts/install.ps1 | iex

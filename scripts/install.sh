@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-REPO="wungjyan/aicommit"
-BINARY="aicommit"
-INSTALL_DIR=""
+repo="wungjyan/aicommit"
+binary="aicommit"
+install_dir="${AICOMMIT_INSTALL_DIR:-$HOME/.local/bin}"
 
 detect_platform() {
   os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -18,66 +18,96 @@ detect_platform() {
     aarch64|arm64) arch="arm64" ;;
     *) echo "Unsupported architecture: $arch"; exit 1 ;;
   esac
-  OS="$os"
-  ARCH="$arch"
 }
 
-detect_install_dir() {
-  if [ -w "/usr/local/bin" ]; then
-    INSTALL_DIR="/usr/local/bin"
-    SUDO=""
-  elif [ -d "/usr/local/bin" ]; then
-    if ! command -v sudo >/dev/null 2>&1; then
-      echo "sudo is required to install to /usr/local/bin but was not found."
-      exit 1
-    fi
-    INSTALL_DIR="/usr/local/bin"
-    SUDO="sudo"
-  else
-    mkdir -p "$HOME/.local/bin"
-    INSTALL_DIR="$HOME/.local/bin"
-    SUDO=""
+prepare_install_dir() {
+  if ! mkdir -p "$install_dir"; then
+    echo "Could not create installation directory: $install_dir" >&2
+    exit 1
+  fi
+  if [ ! -w "$install_dir" ]; then
+    echo "Installation directory is not writable: $install_dir" >&2
+    echo "Choose a writable user directory with AICOMMIT_INSTALL_DIR and run the installer again." >&2
+    exit 1
   fi
 }
 
+path_contains_install_dir() {
+  old_ifs=$IFS
+  IFS=:
+  for path_entry in $PATH; do
+    if [ "${path_entry%/}" = "${install_dir%/}" ]; then
+      IFS=$old_ifs
+      return 0
+    fi
+  done
+  IFS=$old_ifs
+  return 1
+}
+
+shell_config_file() {
+  case "${SHELL:-}" in
+    */zsh) printf '%s\n' "$HOME/.zshrc" ;;
+    */bash)
+      if [ "$os" = "darwin" ]; then
+        printf '%s\n' "$HOME/.bash_profile"
+      else
+        printf '%s\n' "$HOME/.bashrc"
+      fi
+      ;;
+    *) printf '%s\n' "$HOME/.profile" ;;
+  esac
+}
+
+print_path_hint() {
+  if path_contains_install_dir; then
+    return
+  fi
+
+  config_file="$(shell_config_file)"
+  echo ""
+  echo "${install_dir} is not in your PATH."
+  echo "Add this line to ${config_file}, then open a new terminal:"
+  echo "  export PATH=\"${install_dir}:\$PATH\""
+}
+
 get_latest_version() {
-  VERSION=$(curl -fsSL -H "User-Agent: ${REPO}-installer" \
-    "https://api.github.com/repos/${REPO}/releases/latest" \
+  version=$(curl -fsSL -H "User-Agent: ${repo}-installer" \
+    "https://api.github.com/repos/${repo}/releases/latest" \
     | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-  if [ -z "$VERSION" ]; then
-    echo "Failed to fetch latest version"
+  if [ -z "$version" ]; then
+    echo "Failed to fetch latest version" >&2
     exit 1
   fi
 }
 
 main() {
   detect_platform
-  detect_install_dir
+  prepare_install_dir
   get_latest_version
 
-  FILENAME="${BINARY}-${OS}-${ARCH}"
-  URL="https://github.com/${REPO}/releases/download/v${VERSION}/${FILENAME}"
+  filename="${binary}-${os}-${arch}"
+  url="https://github.com/${repo}/releases/download/v${version}/${filename}"
 
-  echo "Installing aicommit v${VERSION}..."
-  echo "  Platform: ${OS}/${ARCH}"
-  echo "  Install to: ${INSTALL_DIR}/${BINARY}"
+  echo "Installing aicommit v${version}..."
+  echo "  Platform: ${os}/${arch}"
+  echo "  Install to: ${install_dir}/${binary}"
 
-  TMPDIR="$(mktemp -d)"
-  trap "rm -rf $TMPDIR" EXIT
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' 0 HUP INT TERM
 
-  curl -fsSL "$URL" -o "${TMPDIR}/${BINARY}"
-  chmod +x "${TMPDIR}/${BINARY}"
+  curl -fsSL "$url" -o "${tmpdir}/${binary}"
+  chmod +x "${tmpdir}/${binary}"
 
-  if ! "${TMPDIR}/${BINARY}" version >/dev/null 2>&1; then
-    echo "Downloaded binary is invalid. Aborting."
+  if ! "${tmpdir}/${binary}" version >/dev/null 2>&1; then
+    echo "Downloaded binary is invalid. Aborting." >&2
     exit 1
   fi
 
-  $SUDO mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+  mv "${tmpdir}/${binary}" "${install_dir}/${binary}"
 
-  echo "Installed: $("${INSTALL_DIR}/${BINARY}" version)"
-  echo ""
-  echo "Make sure ${INSTALL_DIR} is in your PATH."
+  echo "Installed: $("${install_dir}/${binary}" version)"
+  print_path_hint
 }
 
 main
