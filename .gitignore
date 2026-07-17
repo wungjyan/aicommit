@@ -30,6 +30,7 @@ node_modules/
 
 # md files
 *.md
+!AGENTS.md
 !CLAUDE.md
 !README.md
 !README.*.md
