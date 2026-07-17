@@ -89,9 +89,12 @@ func newConfigSetCommand(deps Dependencies) *cobra.Command {
 	f.StringVar(&apiKey, "api-key", "", "OpenAI-compatible API key")
 	f.StringVar(&baseURL, "base-url", "", "OpenAI-compatible base URL (ending in /v1)")
 	f.StringVar(&model, "model", "", "model name")
-	f.StringVar(&backend, "backend", "", "AI backend: openai, codex or claude")
+	// Retain the flag for existing automation and future CLI-backend work, but do
+	// not expose it until those backends meet the interactive latency target.
+	f.StringVar(&backend, "backend", "", "AI backend")
+	_ = f.MarkHidden("backend")
 	f.StringVar(&language, "language", "", "commit message language")
-	f.BoolVar(&check, "check", false, "verify API connectivity or local CLI installation before saving")
+	f.BoolVar(&check, "check", false, "verify API connectivity before saving")
 
 	return cmd
 }

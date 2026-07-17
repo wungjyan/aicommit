@@ -39,31 +39,27 @@ func TestSetupLanguageOnlyPreservesBackend(t *testing.T) {
 	}
 }
 
-// Entry point 1: backend only — must preserve the existing Language.
+// Entry point 1: backend only configures the supported OpenAI-compatible API
+// and must preserve the existing Language.
 func TestSetupBackendOnlyPreservesLanguage(t *testing.T) {
 	deps, _, _ := testDeps()
 	fc := &fakeConfig{cfg: config.Config{Backend: "openai", Language: "中文"}}
 	deps.Config = fc
-	deps.Backend = fakeBackend{checkErr: nil} // CLI installation check passes
-	ui := &recordingUI{}
-	deps.UI = ui
+	deps.Backend = fakeBackend{checkErr: nil}
 
-	// "1" backend group, "2" Codex backend (no further prompts).
-	if err := runSetup(t, deps, "1\n2\n"); err != nil {
+	// Backend group, OpenAI preset, API key, then accept the preset defaults.
+	if err := runSetup(t, deps, "1\n1\nsk-new\n\n\n"); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 	if len(fc.saved) != 1 {
 		t.Fatalf("expected one save, got %d", len(fc.saved))
 	}
 	saved := fc.saved[0]
-	if saved.Backend != "codex" {
-		t.Errorf("backend = %q, want codex", saved.Backend)
+	if saved.Backend != "openai" {
+		t.Errorf("backend = %q, want openai", saved.Backend)
 	}
 	if saved.Language != "中文" {
 		t.Errorf("backend-only setup dropped language: %q", saved.Language)
-	}
-	if len(ui.infos) != 1 || !strings.Contains(ui.infos[0], "will be checked when generating") {
-		t.Errorf("missing deferred provider-check explanation: %v", ui.infos)
 	}
 }
 
@@ -74,8 +70,8 @@ func TestSetupVerificationFailureDoesNotSave(t *testing.T) {
 	deps.Config = fc
 	deps.Backend = fakeBackend{checkErr: errBoom}
 
-	// Backend group -> Codex; verification fails.
-	err := runSetup(t, deps, "1\n2\n")
+	// Backend group -> OpenAI preset; verification fails.
+	err := runSetup(t, deps, "1\n1\nsk-new\n\n\n")
 	if err == nil {
 		t.Fatal("expected error on failed verification")
 	}
@@ -84,19 +80,23 @@ func TestSetupVerificationFailureDoesNotSave(t *testing.T) {
 	}
 }
 
-// The backend submenu must loop on an invalid choice rather than defaulting.
-func TestSetupBackendMenuRejectsInvalid(t *testing.T) {
+// CLI backends must not appear in the interactive setup flow.
+func TestSetupHidesCLIBackendChoices(t *testing.T) {
+	var errOut bytes.Buffer
 	deps, _, _ := testDeps()
-	fc := &fakeConfig{cfg: config.Config{Backend: "openai"}}
-	deps.Config = fc
+	deps.ErrOut = &errOut
+	deps.Config = &fakeConfig{cfg: config.Config{Backend: "openai"}}
+	deps.Backend = fakeBackend{checkErr: nil}
 
-	// Top menu "1", then an invalid backend choice "9" -> usage error.
-	err := runSetup(t, deps, "1\n9\n")
-	if !isUsageError(err) {
-		t.Errorf("expected usage error for invalid backend, got %v", err)
+	if err := runSetup(t, deps, "1\n1\nsk-new\n\n\n"); err != nil {
+		t.Fatalf("setup: %v", err)
 	}
-	if len(fc.saved) != 0 {
-		t.Error("invalid backend choice must not save")
+	got := errOut.String()
+	if !strings.Contains(got, "only currently available backend") {
+		t.Errorf("missing API-only notice:\n%s", got)
+	}
+	if strings.Contains(got, "Codex CLI") || strings.Contains(got, "Claude Code CLI") {
+		t.Errorf("CLI backend appeared in setup flow:\n%s", got)
 	}
 }
 
@@ -107,16 +107,24 @@ func TestSetupAllSettings(t *testing.T) {
 	deps.Config = fc
 	deps.Backend = fakeBackend{checkErr: nil}
 
-	// "3" all, "2" Codex backend (verified), then "1" English language.
-	if err := runSetup(t, deps, "3\n2\n1\n"); err != nil {
+	// All settings, OpenAI preset, API key/defaults, then English language.
+	if err := runSetup(t, deps, "3\n1\nsk-new\n\n\n1\n"); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 	if len(fc.saved) != 1 {
 		t.Fatalf("expected exactly one save, got %d", len(fc.saved))
 	}
 	saved := fc.saved[0]
-	if saved.Backend != "codex" || saved.Language != "English" {
+	if saved.Backend != "openai" || saved.Language != "English" {
 		t.Errorf("all-settings result unexpected: %+v", saved)
+	}
+}
+
+func TestConfigSetHidesBackendFlag(t *testing.T) {
+	deps, _, _ := testDeps()
+	cmd := newConfigSetCommand(deps)
+	if flag := cmd.Flags().Lookup("backend"); flag == nil || !flag.Hidden {
+		t.Fatal("--backend must be hidden until CLI backend latency is acceptable")
 	}
 }
 

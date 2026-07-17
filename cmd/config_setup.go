@@ -111,26 +111,15 @@ func setupAll(cmd *cobra.Command, deps Dependencies, w *wizard, cfg config.Confi
 	return nil
 }
 
-// configureBackend selects a backend, gathers its settings and verifies them.
-// It returns the new config (Language unset) and never persists on its own.
+// configureBackend gathers and verifies the currently supported backend
+// settings. It returns the new config (Language unset) and never persists on
+// its own. Local CLI backends remain implemented for future evaluation, but
+// are intentionally not exposed until they can meet the interactive latency
+// expectation.
 func configureBackend(cmd *cobra.Command, deps Dependencies, w *wizard, cfg config.Config) (config.Config, error) {
 	w.line("")
-	w.line("Select AI backend:")
-	w.line("  1) OpenAI-compatible API")
-	w.line("  2) Codex CLI")
-	w.line("  3) Claude Code CLI")
-
-	choice := w.prompt("Choice [1]: ", "1")
-	switch choice {
-	case "1":
-		return configureOpenAI(cmd, deps, w, cfg)
-	case "2":
-		return configureCLIBackend(cmd, deps, w, cfg, config.BackendCodex)
-	case "3":
-		return configureCLIBackend(cmd, deps, w, cfg, config.BackendClaude)
-	default:
-		return config.Config{}, usageErrorf("invalid backend choice %q", choice)
-	}
+	w.line("OpenAI-compatible API is the only currently available backend.")
+	return configureOpenAI(cmd, deps, w, cfg)
 }
 
 func configureOpenAI(cmd *cobra.Command, deps Dependencies, w *wizard, cfg config.Config) (config.Config, error) {

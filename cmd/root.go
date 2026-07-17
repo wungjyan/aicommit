@@ -31,7 +31,7 @@ func NewRootCommand(deps Dependencies) *cobra.Command {
 		Long: `aicommit generates Conventional Commit messages using AI.
 
 It reads your staged changes (git diff --cached) and uses your
-existing AI environment (API key or local CLI tool) to generate
+OpenAI-compatible API configuration to generate
 a commit message following the Conventional Commits specification.
 
 Usage:
