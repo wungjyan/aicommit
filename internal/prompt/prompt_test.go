@@ -92,3 +92,25 @@ func TestConfirmUsesInjectedStreams(t *testing.T) {
 		t.Errorf("injected output missing confirmation diagnostics:\n%s", got)
 	}
 }
+
+func TestConfirmInvalidMessageEnterOpensEditorInsteadOfRegenerating(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+
+	t.Setenv("EDITOR", "true")
+	var output bytes.Buffer
+	action, edited, err := Confirm(strings.NewReader("\n"), &output, plainStyle{}, "not a commit message", false)
+	if err != nil {
+		t.Fatalf("Confirm returned error: %v", err)
+	}
+	if action != "edit" {
+		t.Errorf("action = %q, want edit", action)
+	}
+	if edited != "not a commit message" {
+		t.Errorf("edited = %q, want original message", edited)
+	}
+	if !strings.Contains(output.String(), "[Enter/e] edit") {
+		t.Errorf("confirmation prompt does not show Enter edit:\n%s", output.String())
+	}
+}

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -56,6 +57,30 @@ func TestCommitWorkflowRevalidatesEditedMessage(t *testing.T) {
 	}
 	if len(gitService.committed) != 0 {
 		t.Errorf("committed = %v, want no commit", gitService.committed)
+	}
+}
+
+func TestCommitWorkflowValidEditedMessageCommitsWithoutRegenerating(t *testing.T) {
+	deps, _, _ := testDeps()
+	gitService := &fakeGit{diff: "diff"}
+	provider := &fakeProvider{messages: []string{"feat: generated message"}}
+	deps.Git = gitService
+	deps.Config = &fakeConfig{cfg: config.Config{APIKey: "sk-test"}}
+	deps.Provider = fakeFactory{provider: provider}
+	deps.Confirm = &scriptedConfirm{actions: []confirmStep{
+		{action: "edit", edited: "fix: edited message"},
+		{action: "commit"},
+	}}
+
+	if err := NewCommitWorkflow(deps).Run(context.Background()); err != nil {
+		t.Fatalf("workflow returned error: %v", err)
+	}
+
+	if provider.calls != 1 {
+		t.Errorf("Generate called %d times, want 1", provider.calls)
+	}
+	if got, want := gitService.committed, []string{"fix: edited message"}; !slices.Equal(got, want) {
+		t.Errorf("committed = %v, want %v", got, want)
 	}
 }
 

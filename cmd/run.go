@@ -90,9 +90,10 @@ func (w *CommitWorkflow) runWithOptions(ctx context.Context, options runOptions,
 	}
 
 	for {
-		valid := prompt.ValidateMessage(message) == nil
-		if !valid {
-			w.ui.Warn("Message does not follow Conventional Commits format.")
+		validationErr := prompt.ValidateMessage(message)
+		valid := validationErr == nil
+		if validationErr != nil {
+			w.ui.Warn("Message does not follow Conventional Commits format: " + validationErr.Error())
 		}
 
 		action, editedMessage, err := w.confirm.Confirm(message, valid)

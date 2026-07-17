@@ -82,7 +82,7 @@ func Confirm(in io.Reader, out io.Writer, style Style, message string, valid boo
 			)
 		} else {
 			fmt.Fprintf(out, "%s  %s  %s\n",
-				style.Bold("[e]")+" edit",
+				style.Bold("[Enter/e]")+" edit",
 				style.Bold("[r]")+" regenerate",
 				style.Bold("[q]")+" quit",
 			)
@@ -115,13 +115,13 @@ func Confirm(in io.Reader, out io.Writer, style Style, message string, valid boo
 		}
 
 		switch input {
-		case "e", "edit":
+		case "", "e", "edit":
 			edited, editErr := EditMessage(in, out, out, message)
 			if editErr != nil {
 				return "", "", editErr
 			}
 			return "edit", edited, nil
-		case "r", "regenerate", "":
+		case "r", "regenerate":
 			return "regenerate", "", nil
 		case "q", "quit":
 			return "quit", "", nil
