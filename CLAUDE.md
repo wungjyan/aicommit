@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Development notes for this repository.
 
 ## Commands
 
@@ -11,11 +11,9 @@ go build -o aicommit .
 # Build with version info
 go build -ldflags "-X github.com/wungjyan/aicommit/cmd.version=x.y.z -X github.com/wungjyan/aicommit/cmd.commit=$(git rev-parse --short HEAD) -X github.com/wungjyan/aicommit/cmd.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o aicommit .
 
-# Run all tests
+# Test and static analysis
 go test ./...
-
-# Run a single test
-go test ./internal/git/ -run TestGetStagedDiff -v
+go vet ./...
 
 # Install locally
 go install .
@@ -23,42 +21,56 @@ go install .
 
 ## Architecture
 
-The main flow is: `cmd/root.go:run()` → git → AI → prompt → git commit.
+`main.go` calls `cmd.Execute()`, which creates a fresh Cobra command tree with injected input, stdout, stderr, Git, configuration, provider, and UI dependencies.
 
-```
-main.go
-  └── cmd/
-        ├── root.go     — root command; orchestrates the full flow
-        └── ai.go       — `aicommit ai [--setup]` subcommand for config management
+```text
+cmd/
+  root.go          root command, modes, version command, terminal checks
+  run.go           CommitWorkflow: diff -> provider -> validate -> confirm/commit
+  config*.go       config display, setup, set, check, and path commands
+  errors.go        usage/AI/validation error categories and exit-code mapping
+  adapters.go      production adapters and stream wiring
 
 internal/
-  ├── ai/
-  │     ├── provider.go — Provider interface (Generate)
-  │     └── openai.go   — OpenAIProvider: HTTP client for OpenAI-compatible APIs
-  │                       Ping() sends a minimal /chat/completions request for verification
-  ├── config/
-  │     └── config.go   — reads/writes ~/.aicommit/config.json
-  ├── git/
-  │     ├── diff.go     — IsGitRepo, GetStagedDiff, TruncateDiff (80KB default cap)
-  │     └── commit.go   — Commit(message)
-  ├── prompt/
-  │     └── prompt.go   — ValidateMessage (Conventional Commits regex),
-  │                       Confirm (interactive: Enter/e/r/q; edit re-validates),
-  │                       editMessage (runs $EDITOR via sh -c for arg parsing)
-  └── ui/
-        └── ui.go       — ANSI colors + Spinner; auto-disabled when stdout is not a TTY
+  ai/              OpenAI-compatible provider plus retained experimental CLI providers
+  config/          persisted config and effective environment resolution
+  git/             staged diff, truncation, and commit execution
+  prompt/          validation plus injected confirmation/editor streams
+  ui/              injected stderr diagnostics, color, and spinner
 ```
 
-### Key design decisions
+## Key Decisions
 
-**Config priority**: env vars (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`) override `~/.aicommit/config.json`, which overrides built-in defaults. This lets CI/power users override without touching the config file.
+**Effective configuration:** `AICOMMIT_BACKEND` and `AICOMMIT_LANGUAGE` apply to all implemented backends. For the OpenAI backend, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL` override the saved config. Resolution follows environment, config file, then defaults. Older config files without `backend` mean `openai`.
 
-**Error handling**: `cmd/root.go:Execute()` sets `SilenceErrors` and `SilenceUsage` on the cobra root command, then prints errors via `ui.Error()` for colored output. All sentinel errors (`ErrNotConfigured`, `ErrAPIKeyInvalid`, `ErrRateLimited`, `ErrNoStagedChanges`, `ErrNotGitRepo`) are defined in their respective packages and checked with `errors.Is`.
+**Backends:** The OpenAI-compatible API is the only backend exposed in the setup flow and is used for normal releases. Codex and Claude providers remain in the codebase for future latency work, but their choices and `--backend` flag are hidden from public help. If working on those retained providers, do not read or persist CLI credentials.
 
-**AI provider**: `OpenAIProvider` speaks the OpenAI chat completions API directly over `net/http` (no SDK). The base URL is configurable so any OpenAI-compatible endpoint works (DeepSeek, OpenRouter, Bailian, etc.). The request URL is always `baseURL + "/chat/completions"`, so `baseURL` must end at `/v1` (no trailing slash — trimmed on construction).
+**Configuration commands:** `aicommit config` displays effective values and sources. `config setup` configures the OpenAI-compatible API and output language. `config set` makes field-level non-interactive changes, and `config check` checks API connectivity without modifying config.
 
-**Setup wizard** (`aicommit ai --setup`): presents preset providers with correct base URLs and models pre-filled, then calls `Ping()` (minimal `/chat/completions` request) to verify before saving. This catches wrong URLs and invalid keys before they cause confusing errors at commit time.
+**Workflow:** `CommitWorkflow` truncates the staged diff before every provider sees it. Regeneration reuses that same bounded diff. Every generated or edited message is validated before commit.
 
-**Message validation**: `Confirm` accepts a `valid bool` parameter. When validation fails, the commit option is hidden — the user must edit or regenerate. After editing, the main loop re-validates the edited message before allowing commit, preventing invalid messages from slipping through.
+**Output:** stdout is data-only (`--dry-run`, config display/JSON/path, version). Spinner, status, confirmation prompts, warnings, and errors use stderr through `internal/ui.UI`.
 
-**Editor support**: `editMessage` runs the `$EDITOR` / `$VISUAL` value through `sh -c`, so arguments (e.g. `code --wait`) and paths with spaces are handled correctly.
+**Exit codes:** `0` is success, `1` is a general runtime failure, `2` is invalid usage, `3` is an AI backend failure, and `4` is an invalid automatically generated message. Preserve AI sentinel errors with `%w` so `cmd.ExitCode` can classify them.
+
+**Editor:** `$EDITOR`, then `$VISUAL`, then `vim` is invoked through `sh -c` to support editor arguments such as `code --wait`. The editor's streams are injected by the command adapter.
+
+## Releases
+
+`CHANGELOG.md` is the source of GitHub Release notes. Keep user-visible changes
+under `## Unreleased`; categories inside that section use `###` headings.
+
+```bash
+bash scripts/release.sh 0.1.7 --dry-run
+bash scripts/release.sh 0.1.7
+```
+
+The release helper requires a clean tree, a valid unused version, and non-empty
+notes. It freezes the Unreleased section, commits `CHANGELOG.md`, and creates an
+annotated tag. The tag workflow runs `go test ./...`, builds all six native
+assets, extracts the matching CHANGELOG section into the GitHub Release, then
+publishes npm.
+
+The npm package is a Node-based downloader and launcher for the native binary.
+Its published package version is set from the release tag; `npm/postinstall.js`
+must download that same version's asset, never GitHub's latest release.
