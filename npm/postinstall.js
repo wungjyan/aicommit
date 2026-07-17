@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 "use strict";
 
-const { execSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -9,6 +8,7 @@ const https = require("https");
 
 const REPO = "wungjyan/aicommit";
 const BINARY = "aicommit";
+const PACKAGE_VERSION = require("./package.json").version;
 
 function getPlatform() {
   switch (os.platform()) {
@@ -25,30 +25,6 @@ function getArch() {
     case "arm64": return "arm64";
     default: throw new Error(`Unsupported architecture: ${os.arch()}`);
   }
-}
-
-function getLatestVersion() {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: "api.github.com",
-      path: `/repos/${REPO}/releases/latest`,
-      headers: { "User-Agent": "@wungjyan/aicommit" },
-    };
-    https.get(options, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try {
-          const json = JSON.parse(data);
-          const tag = json.tag_name || "";
-          const version = tag.replace(/^v/, "");
-          resolve(version);
-        } catch (e) {
-          reject(new Error(`Failed to parse GitHub API response: ${e.message}`));
-        }
-      });
-    }).on("error", reject);
-  });
 }
 
 function download(url, dest) {
@@ -76,7 +52,11 @@ async function main() {
   const platform = getPlatform();
   const arch = getArch();
   const ext = platform === "windows" ? ".exe" : "";
-  const version = await getLatestVersion();
+  if (!PACKAGE_VERSION) {
+    throw new Error("Package version is missing");
+  }
+
+  const version = PACKAGE_VERSION;
   const filename = `${BINARY}-${platform}-${arch}${ext}`;
   const url = `https://github.com/${REPO}/releases/download/v${version}/${filename}`;
 
