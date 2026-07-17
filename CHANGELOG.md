@@ -5,6 +5,11 @@ chronological order.
 
 ## Unreleased
 
+### Added
+
+- `aicommit uninstall` removes a direct binary installation; add `--purge` to remove saved configuration too.
+- `aicommit -v` and `aicommit --version` provide shortcuts for version information.
+
 ## 0.1.7 - 2026-07-17
 
 ### Breaking Changes

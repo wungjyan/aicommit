@@ -50,6 +50,21 @@ func TestVersionCommand(t *testing.T) {
 	}
 }
 
+func TestVersionFlags(t *testing.T) {
+	for _, flag := range []string{"-v", "--version"} {
+		t.Run(flag, func(t *testing.T) {
+			deps, out, _ := testDeps()
+			if err := execute(NewRootCommand(deps), flag); err != nil {
+				t.Fatalf("%s returned error: %v", flag, err)
+			}
+			want := "aicommit 1.2.3 (commit: abc1234, built: 2026-07-16T00:00:00Z)"
+			if got := strings.TrimSpace(out.String()); got != want {
+				t.Errorf("version output = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestUnknownCommand(t *testing.T) {
 	deps, _, _ := testDeps()
 	cmd := NewRootCommand(deps)

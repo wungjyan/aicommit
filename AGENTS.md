@@ -68,18 +68,20 @@ cmd.NewRootCommand
 ```
 
 `cmd/root.go` owns top-level command construction and terminal checks;
-`cmd/run.go` owns the commit workflow; and `cmd/config*.go` owns
-configuration display and setup. Keep package-level code focused on its
-boundary rather than moving CLI control flow into `internal/*` packages.
+`cmd/run.go` owns the commit workflow; `cmd/config*.go` owns configuration
+display and setup; and `cmd/uninstall*.go` owns binary removal and optional
+configuration cleanup. Keep package-level code focused on its boundary rather
+than moving CLI control flow into `internal/*` packages.
 
 ## Package Responsibilities
 
 ```text
 cmd/
-  root.go       root command, version command, terminal checks
-  run.go        diff -> generation -> validation -> confirmation/commit workflow
-  config*.go    configuration display, setup, set, check, and path commands
-  errors.go     error categories and exit-code mapping
+  root.go         root command, version command, terminal checks
+  run.go          diff -> generation -> validation -> confirmation/commit workflow
+  config*.go      configuration display, setup, set, check, and path commands
+  uninstall*.go   binary removal and optional configuration purge
+  errors.go       error categories and exit-code mapping
 
 internal/
   ai/           Provider interface and OpenAI-compatible HTTP implementation
@@ -163,6 +165,9 @@ exit in `main.go`.
 - Keep README documentation in English and Chinese in sync when changing a
   user-visible command, configuration option, supported provider, or install
   path.
+- `aicommit uninstall` must preserve configuration by default. `--purge`
+  requires confirmation unless `--yes` is supplied; Windows must defer removal
+  of the running executable until the process exits.
 - The npm package is a distribution wrapper, not an alternate implementation.
   Release asset names must remain `aicommit-<platform>-<arch>[.exe]` to match
   `npm/postinstall.js`. The postinstall script must download the asset for its

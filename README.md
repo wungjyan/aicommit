@@ -40,6 +40,31 @@ go install github.com/wungjyan/aicommit@latest
 
 Build from source with `go build -o aicommit .`.
 
+## Uninstall
+
+For a binary installed by the shell or PowerShell installer, remove the binary while keeping your API configuration:
+
+```bash
+aicommit uninstall
+```
+
+To also remove `~/.aicommit` and its saved configuration, confirm the prompt or use `--yes` in a script:
+
+```bash
+aicommit uninstall --purge
+aicommit uninstall --purge --yes
+```
+
+For an npm installation, use `npm uninstall -g @wungjyan/aicommit` instead.
+
+For a Go installation, use Go's configured binary directory:
+
+```bash
+go_bin="$(go env GOBIN)"
+[ -n "$go_bin" ] || go_bin="$(go env GOPATH)/bin"
+rm -f "$go_bin/aicommit"
+```
+
 ## Quick Start
 
 Configure a backend once, then use the normal Git workflow:
@@ -134,7 +159,9 @@ Add `--check` before saving to verify OpenAI-compatible API connectivity. A fail
 | `aicommit config set [flags]` | Persist one or more configuration fields |
 | `aicommit config check` | Check API connectivity without changing config |
 | `aicommit config path` | Print the absolute configuration path |
-| `aicommit version` | Print version, commit, and build time |
+| `aicommit -v`, `aicommit --version`, `aicommit version` | Print version, commit, and build time |
+| `aicommit uninstall` | Remove the installed binary and keep configuration |
+| `aicommit uninstall --purge` | Also remove saved configuration (asks for confirmation) |
 
 All commands reject unexpected positional arguments. `--dry-run` cannot be combined with `--yes` or `--edit`. `--edit` requires stdin, stdout, and stderr to be terminals. In a non-interactive environment, use `--dry-run` or `--yes`.
 

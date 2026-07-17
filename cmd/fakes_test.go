@@ -146,6 +146,20 @@ type fakeEditor struct {
 	calls  int
 }
 
+type fakeUninstaller struct {
+	result UninstallResult
+	err    error
+	purges []bool
+}
+
+func (f *fakeUninstaller) Uninstall(purge bool) (UninstallResult, error) {
+	f.purges = append(f.purges, purge)
+	if f.err != nil {
+		return UninstallResult{}, f.err
+	}
+	return f.result, nil
+}
+
 func (f *fakeEditor) Edit(message string) (string, error) {
 	f.calls++
 	if f.err != nil {
@@ -181,18 +195,19 @@ func (c *scriptedConfirm) Confirm(message string, valid bool) (string, string, e
 func testDeps() (Dependencies, *bytes.Buffer, *bytes.Buffer) {
 	var out, errOut bytes.Buffer
 	deps := Dependencies{
-		In:       new(bytes.Buffer),
-		Out:      &out,
-		ErrOut:   &errOut,
-		Git:      &fakeGit{},
-		Config:   &fakeConfig{},
-		Provider: fakeFactory{provider: &fakeProvider{messages: []string{"feat: add thing"}}},
-		Backend:  fakeBackend{},
-		UI:       &recordingUI{},
-		Confirm:  &scriptedConfirm{},
-		Editor:   &fakeEditor{},
-		IsTTY:    func(any) bool { return true },
-		Version:  VersionInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-07-16T00:00:00Z"},
+		In:          new(bytes.Buffer),
+		Out:         &out,
+		ErrOut:      &errOut,
+		Git:         &fakeGit{},
+		Config:      &fakeConfig{},
+		Provider:    fakeFactory{provider: &fakeProvider{messages: []string{"feat: add thing"}}},
+		Backend:     fakeBackend{},
+		UI:          &recordingUI{},
+		Confirm:     &scriptedConfirm{},
+		Editor:      &fakeEditor{},
+		Uninstaller: &fakeUninstaller{},
+		IsTTY:       func(any) bool { return true },
+		Version:     VersionInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-07-16T00:00:00Z"},
 	}
 	return deps, &out, &errOut
 }

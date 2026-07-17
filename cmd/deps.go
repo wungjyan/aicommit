@@ -19,14 +19,15 @@ type Dependencies struct {
 	Out    io.Writer
 	ErrOut io.Writer
 
-	Git      GitService
-	Config   ConfigStore
-	Provider ProviderFactory
-	Backend  BackendService
-	UI       UI
-	Confirm  Confirmer
-	Editor   MessageEditor
-	IsTTY    func(any) bool
+	Git         GitService
+	Config      ConfigStore
+	Provider    ProviderFactory
+	Backend     BackendService
+	UI          UI
+	Confirm     Confirmer
+	Editor      MessageEditor
+	Uninstaller Uninstaller
+	IsTTY       func(any) bool
 
 	Version VersionInfo
 }
@@ -36,6 +37,20 @@ type VersionInfo struct {
 	Version string
 	Commit  string
 	Date    string
+}
+
+// UninstallResult describes the files removed by an uninstall operation.
+type UninstallResult struct {
+	Executable    string
+	ConfigDir     string
+	ConfigRemoved bool
+}
+
+// Uninstaller removes the current binary and, when requested, its persisted
+// configuration. It is separate from ConfigStore because uninstall must work
+// even when the configuration is unreadable.
+type Uninstaller interface {
+	Uninstall(purge bool) (UninstallResult, error)
 }
 
 // GitService abstracts the git operations used by the command layer.

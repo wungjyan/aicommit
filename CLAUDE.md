@@ -28,6 +28,7 @@ cmd/
   root.go          root command, modes, version command, terminal checks
   run.go           CommitWorkflow: diff -> provider -> validate -> confirm/commit
   config*.go       config display, setup, set, check, and path commands
+  uninstall*.go    binary removal and optional configuration purge
   errors.go        usage/AI/validation error categories and exit-code mapping
   adapters.go      production adapters and stream wiring
 
@@ -46,6 +47,8 @@ internal/
 **Backends:** The OpenAI-compatible API is the only backend exposed in the setup flow and is used for normal releases. Codex and Claude providers remain in the codebase for future latency work, but their choices and `--backend` flag are hidden from public help. If working on those retained providers, do not read or persist CLI credentials.
 
 **Configuration commands:** `aicommit config` displays effective values and sources. `config setup` configures the OpenAI-compatible API and output language. `config set` makes field-level non-interactive changes, and `config check` checks API connectivity without modifying config.
+
+**Uninstall:** `aicommit uninstall` removes the current direct-install binary while preserving configuration. `--purge` also removes `~/.aicommit`, asks for confirmation unless `--yes` is given, and schedules self-removal after process exit on Windows. npm installations should use npm's uninstall command.
 
 **Workflow:** `CommitWorkflow` truncates the staged diff before every provider sees it. Regeneration reuses that same bounded diff. Every generated or edited message is validated before commit.
 

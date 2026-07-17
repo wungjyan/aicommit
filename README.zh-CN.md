@@ -40,6 +40,31 @@ go install github.com/wungjyan/aicommit@latest
 
 从源码构建：`go build -o aicommit .`。
 
+## 卸载
+
+通过 Shell 或 PowerShell 安装脚本安装的二进制，可使用下列命令删除，同时保留 API 配置：
+
+```bash
+aicommit uninstall
+```
+
+如需同时删除 `~/.aicommit` 及已保存的配置，请在提示中确认；脚本中可使用 `--yes`：
+
+```bash
+aicommit uninstall --purge
+aicommit uninstall --purge --yes
+```
+
+通过 npm 安装时，请改用 `npm uninstall -g @wungjyan/aicommit`。
+
+通过 Go 安装时，请根据 Go 配置的二进制目录删除：
+
+```bash
+go_bin="$(go env GOBIN)"
+[ -n "$go_bin" ] || go_bin="$(go env GOPATH)/bin"
+rm -f "$go_bin/aicommit"
+```
+
 ## 快速开始
 
 先配置一次后端，再使用正常的 Git 工作流：
@@ -134,7 +159,9 @@ aicommit config set --language 中文
 | `aicommit config set [flags]` | 持久化修改一个或多个配置字段 |
 | `aicommit config check` | 检查 API 连通性，不修改配置 |
 | `aicommit config path` | 输出配置文件绝对路径 |
-| `aicommit version` | 输出版本、提交和构建时间 |
+| `aicommit -v`、`aicommit --version`、`aicommit version` | 输出版本、提交和构建时间 |
+| `aicommit uninstall` | 删除已安装二进制，保留配置 |
+| `aicommit uninstall --purge` | 同时删除已保存配置（会请求确认） |
 
 所有命令都拒绝额外位置参数。`--dry-run` 不能与 `--yes` 或 `--edit` 一起使用。`--edit` 要求 stdin、stdout 和 stderr 都是终端。非交互环境必须使用 `--dry-run` 或 `--yes`。
 

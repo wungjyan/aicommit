@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -24,6 +25,7 @@ var (
 // process without global flag pollution.
 func NewRootCommand(deps Dependencies) *cobra.Command {
 	var options runOptions
+	var showVersion bool
 
 	rootCmd := &cobra.Command{
 		Use:   "aicommit",
@@ -41,6 +43,9 @@ Usage:
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if showVersion {
+				return nil
+			}
 			if err := validateRunOptions(deps, options); err != nil {
 				return err
 			}
@@ -50,6 +55,10 @@ Usage:
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if showVersion {
+				printVersion(cmd.OutOrStdout(), deps.Version)
+				return nil
+			}
 			return NewCommitWorkflow(deps).runWithOptions(cmd.Context(), options, cmd.OutOrStdout())
 		},
 	}
@@ -64,9 +73,11 @@ Usage:
 	rootCmd.Flags().BoolVarP(&options.yes, "yes", "y", false, "commit the generated message without confirmation")
 	rootCmd.Flags().BoolVarP(&options.edit, "edit", "e", false, "edit the generated message before continuing")
 	rootCmd.Flags().BoolVar(&options.noColor, "no-color", false, "disable ANSI color output")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "print version information")
 
 	rootCmd.AddCommand(newVersionCommand(deps))
 	rootCmd.AddCommand(newConfigCommand(deps))
+	rootCmd.AddCommand(newUninstallCommand(deps))
 
 	return rootCmd
 }
@@ -110,11 +121,14 @@ func newVersionCommand(deps Dependencies) *cobra.Command {
 		Short: "Print version information",
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			v := deps.Version
-			fmt.Fprintf(cmd.OutOrStdout(), "aicommit %s (commit: %s, built: %s)\n", v.Version, v.Commit, v.Date)
+			printVersion(cmd.OutOrStdout(), deps.Version)
 			return nil
 		},
 	}
+}
+
+func printVersion(out io.Writer, v VersionInfo) {
+	fmt.Fprintf(out, "aicommit %s (commit: %s, built: %s)\n", v.Version, v.Commit, v.Date)
 }
 
 // Execute builds the production command tree and runs it. Errors are printed via

@@ -17,18 +17,19 @@ import (
 func productionDeps(v VersionInfo, in io.Reader, out, errOut io.Writer) Dependencies {
 	terminalUI := ui.New(errOut)
 	return Dependencies{
-		In:       in,
-		Out:      out,
-		ErrOut:   errOut,
-		Git:      gitAdapter{},
-		Config:   configAdapter{},
-		Provider: providerFactory{},
-		Backend:  backendAdapter{},
-		UI:       terminalUI,
-		Confirm:  confirmAdapter{in: in, out: errOut, style: terminalUI},
-		Editor:   editorAdapter{in: in, out: errOut, errOut: errOut},
-		IsTTY:    isTerminal,
-		Version:  v,
+		In:          in,
+		Out:         out,
+		ErrOut:      errOut,
+		Git:         gitAdapter{},
+		Config:      configAdapter{},
+		Provider:    providerFactory{},
+		Backend:     backendAdapter{},
+		UI:          terminalUI,
+		Confirm:     confirmAdapter{in: in, out: errOut, style: terminalUI},
+		Editor:      editorAdapter{in: in, out: errOut, errOut: errOut},
+		Uninstaller: systemUninstaller{},
+		IsTTY:       isTerminal,
+		Version:     v,
 	}
 }
 
