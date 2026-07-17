@@ -33,5 +33,7 @@ node_modules/
 !CLAUDE.md
 !README.md
 !README.*.md
+!CHANGELOG.md
 !docs/
-!docs/command-refactor-plan.md
+!docs/releasing.md
+!docs/releasing.zh-CN.md
