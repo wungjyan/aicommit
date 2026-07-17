@@ -5,6 +5,8 @@ chronological order.
 
 ## Unreleased
 
+## 0.1.7 - 2026-07-17
+
 ### Breaking Changes
 
 - Reworked configuration commands: `aicommit ai` and `aicommit ai --setup` have been removed. Use `aicommit config` and `aicommit config setup` instead.
