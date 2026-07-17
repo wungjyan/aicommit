@@ -47,7 +47,9 @@ func TestEditMessage(t *testing.T) {
 	}
 
 	t.Run("editor with arguments", func(t *testing.T) {
-		os.Setenv("EDITOR", "sed -i '' s/original/edited/")
+		// Use a portable shell command that receives the temp-file path as $1.
+		// GNU sed and BSD sed use incompatible -i syntax, so avoid sed -i here.
+		os.Setenv("EDITOR", "sh -c 'printf %s \"edited text\" > \"$1\"' --")
 		defer os.Unsetenv("EDITOR")
 
 		result, err := EditMessage(strings.NewReader(""), io.Discard, io.Discard, "original text")
